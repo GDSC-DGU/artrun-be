@@ -1,13 +1,12 @@
-package com.artrun.dgu.demo;
+package com.artrun.server;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;
 
 @SpringBootTest
-class DemoApplicationTests {
+class ArtrunApplicationTests {
 
 	@Test
 	void contextLoads() {
 	}
-
 }
