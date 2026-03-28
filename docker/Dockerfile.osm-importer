@@ -1,0 +1,15 @@
+FROM ubuntu:22.04
+
+RUN apt-get update && apt-get install -y \
+    osm2pgrouting \
+    osmium-tool \
+    postgresql-client \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /data
+COPY import-osm.sh /scripts/import-osm.sh
+COPY mapconfig_for_pedestrian.xml /usr/share/osm2pgrouting/mapconfig_for_pedestrian.xml
+RUN chmod +x /scripts/import-osm.sh
+
+ENTRYPOINT ["/scripts/import-osm.sh"]
