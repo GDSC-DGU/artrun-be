@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+  <tag_name name="highway" id="1">
+    <tag_value name="footway"        id="101" priority="1.0" maxspeed="5"  />
+    <tag_value name="pedestrian"     id="102" priority="1.0" maxspeed="5"  />
+    <tag_value name="path"           id="103" priority="1.2" maxspeed="5"  />
+    <tag_value name="steps"          id="104" priority="2.0" maxspeed="3"  />
+    <tag_value name="residential"    id="105" priority="1.5" maxspeed="30" />
+    <tag_value name="living_street"  id="106" priority="1.3" maxspeed="20" />
+    <tag_value name="service"        id="107" priority="1.5" maxspeed="20" />
+    <tag_value name="track"          id="108" priority="1.8" maxspeed="10" />
+    <tag_value name="cycleway"       id="109" priority="1.5" maxspeed="15" />
+    <tag_value name="unclassified"   id="110" priority="2.0" maxspeed="40" />
+    <tag_value name="tertiary"       id="111" priority="2.5" maxspeed="50" />
+    <tag_value name="secondary"      id="112" priority="3.0" maxspeed="60" />
+  </tag_name>
+</configuration>
