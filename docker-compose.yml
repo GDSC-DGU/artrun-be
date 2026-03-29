@@ -43,11 +43,22 @@ services:
       REDIS_PORT: 6379
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       SPRING_PROFILES_ACTIVE: local
+      PYTHON_SERVICE_URL: http://python-service:8000
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_started
+      python-service:
+        condition: service_started
+
+  python-service:
+    build: ./python-service
+    container_name: artrun-python
+    ports:
+      - "8001:8000"
+    volumes:
+      - ./python-service/output:/output
 
 volumes:
   pgdata:

@@ -97,3 +97,7 @@ logging:
   level:
     com.artrun.server: INFO
     org.hibernate.SQL: WARN
+
+python:
+  service:
+    url: ${PYTHON_SERVICE_URL:http://localhost:8000}
