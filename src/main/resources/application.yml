@@ -25,6 +25,9 @@ gemini:
   api-key: ${GEMINI_API_KEY:}
   model: ${GEMINI_MODEL:gemini-2.0-flash}
 
+mapbox:
+  api-key: ${MAPBOX_API_KEY:}
+
 server:
   port: ${PORT:8080}
 
