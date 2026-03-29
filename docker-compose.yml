@@ -1,15 +1,14 @@
-version: '3.8'
-
 services:
   db:
-    image: postgis/postgis:16-3.4
+    image: pgrouting/pgrouting:16-3.5-4.0.1
     container_name: artrun-db
     environment:
       POSTGRES_DB: artrun
       POSTGRES_USER: artrun
       POSTGRES_PASSWORD: artrun
+      POSTGRES_HOST_AUTH_METHOD: trust
     ports:
-      - "5432:5432"
+      - "5433:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
       - ./docker/init-pgrouting.sql:/docker-entrypoint-initdb.d/init-pgrouting.sql
@@ -42,6 +41,7 @@ services:
       DB_PASSWORD: artrun
       REDIS_HOST: redis
       REDIS_PORT: 6379
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       SPRING_PROFILES_ACTIVE: local
     depends_on:
       db:

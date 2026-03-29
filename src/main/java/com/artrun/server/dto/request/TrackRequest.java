@@ -10,10 +10,10 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class TrackRequest {
 
-    @NotNull
+    @NotNull(message = "위도를 입력해주세요.")
     private Double lat;
 
-    @NotNull
+    @NotNull(message = "경도를 입력해주세요.")
     private Double lng;
 
     private Long timestamp;

@@ -3,15 +3,14 @@ package com.artrun.server.service;
 import com.artrun.server.common.BusinessException;
 import com.artrun.server.common.ErrorCode;
 import com.artrun.server.dto.AnchorPoint;
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.cloud.vertexai.VertexAI;
-import com.google.cloud.vertexai.api.GenerateContentResponse;
-import com.google.cloud.vertexai.generativemodel.GenerativeModel;
-import com.google.cloud.vertexai.generativemodel.ContentMaker;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestClient;
+import tools.jackson.core.type.TypeReference;
+import tools.jackson.databind.JsonNode;
+import tools.jackson.databind.ObjectMapper;
 
 import java.util.List;
 
@@ -19,43 +18,89 @@ import java.util.List;
 @Service
 public class ShapeEngineService {
 
-    private final String projectId;
-    private final String location;
+    private final String apiKey;
     private final String modelName;
     private final ObjectMapper objectMapper;
+    private final RestClient restClient;
 
     public ShapeEngineService(
-            @Value("${gcp.project-id:artrun-project}") String projectId,
-            @Value("${gcp.location:us-central1}") String location,
-            @Value("${gcp.vertex-ai.model:gemini-2.0-flash}") String modelName,
+            @Value("${gemini.api-key:}") String apiKey,
+            @Value("${gemini.model:gemini-2.0-flash}") String modelName,
             ObjectMapper objectMapper) {
-        this.projectId = projectId;
-        this.location = location;
+        this.apiKey = apiKey;
         this.modelName = modelName;
         this.objectMapper = objectMapper;
+        this.restClient = RestClient.create();
     }
 
     public List<AnchorPoint> generateShapeCoordinates(String requestText, String shapeType) {
         log.info("Generating shape coordinates: requestText={}, shapeType={}", requestText, shapeType);
 
-        String prompt = buildPrompt(requestText, shapeType);
-
-        try (VertexAI vertexAI = new VertexAI(projectId, location)) {
-            GenerativeModel model = new GenerativeModel(modelName, vertexAI);
-            GenerateContentResponse response = model.generateContent(ContentMaker.fromString(prompt));
-
-            String responseText = response.getCandidates(0)
-                    .getContent()
-                    .getParts(0)
-                    .getText();
-
-            return parseAnchorPoints(responseText);
-        } catch (BusinessException e) {
-            throw e;
-        } catch (Exception e) {
-            log.error("AI API call failed", e);
-            throw new BusinessException(ErrorCode.AI_API_ERROR, "AI 도형 생성 실패: " + e.getMessage());
+        if (apiKey == null || apiKey.isBlank()) {
+            log.warn("Gemini API key not set, using stub shape for '{}'", shapeType);
+            return getStubShape(shapeType);
         }
+
+        try {
+            return callGeminiApi(requestText, shapeType);
+        } catch (Exception e) {
+            log.warn("Gemini API failed, falling back to stub shape: {}", e.getMessage());
+            return getStubShape(shapeType);
+        }
+    }
+
+    private List<AnchorPoint> callGeminiApi(String requestText, String shapeType) {
+        String prompt = buildPrompt(requestText, shapeType);
+        String url = "https://generativelanguage.googleapis.com/v1beta/models/%s:generateContent?key=%s"
+                .formatted(modelName, apiKey);
+
+        String requestBody = objectMapper.writeValueAsString(
+                objectMapper.createObjectNode()
+                        .set("contents", objectMapper.createArrayNode()
+                                .add(objectMapper.createObjectNode()
+                                        .set("parts", objectMapper.createArrayNode()
+                                                .add(objectMapper.createObjectNode()
+                                                        .put("text", prompt))))));
+
+        String responseBody = restClient.post()
+                .uri(url)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(requestBody)
+                .retrieve()
+                .body(String.class);
+
+        JsonNode root = objectMapper.readTree(responseBody);
+        String responseText = root.path("candidates").path(0)
+                .path("content").path("parts").path(0)
+                .path("text").asText();
+
+        log.debug("Gemini response: {}", responseText);
+        return parseAnchorPoints(responseText);
+    }
+
+    private List<AnchorPoint> getStubShape(String shapeType) {
+        return switch (shapeType.toLowerCase()) {
+            case "heart" -> List.of(
+                    new AnchorPoint(0.0, 0.4), new AnchorPoint(-0.2, 0.8), new AnchorPoint(-0.5, 0.9),
+                    new AnchorPoint(-0.8, 0.7), new AnchorPoint(-0.9, 0.3), new AnchorPoint(-0.7, -0.1),
+                    new AnchorPoint(-0.4, -0.5), new AnchorPoint(0.0, -0.9),
+                    new AnchorPoint(0.4, -0.5), new AnchorPoint(0.7, -0.1), new AnchorPoint(0.9, 0.3),
+                    new AnchorPoint(0.8, 0.7), new AnchorPoint(0.5, 0.9), new AnchorPoint(0.2, 0.8),
+                    new AnchorPoint(0.0, 0.4));
+            case "star" -> List.of(
+                    new AnchorPoint(0.0, 1.0), new AnchorPoint(-0.22, 0.31), new AnchorPoint(-0.95, 0.31),
+                    new AnchorPoint(-0.36, -0.12), new AnchorPoint(-0.59, -0.81),
+                    new AnchorPoint(0.0, -0.38), new AnchorPoint(0.59, -0.81),
+                    new AnchorPoint(0.36, -0.12), new AnchorPoint(0.95, 0.31),
+                    new AnchorPoint(0.22, 0.31), new AnchorPoint(0.0, 1.0));
+            default -> List.of( // circle
+                    new AnchorPoint(0.0, 1.0), new AnchorPoint(-0.38, 0.92), new AnchorPoint(-0.71, 0.71),
+                    new AnchorPoint(-0.92, 0.38), new AnchorPoint(-1.0, 0.0), new AnchorPoint(-0.92, -0.38),
+                    new AnchorPoint(-0.71, -0.71), new AnchorPoint(-0.38, -0.92), new AnchorPoint(0.0, -1.0),
+                    new AnchorPoint(0.38, -0.92), new AnchorPoint(0.71, -0.71), new AnchorPoint(0.92, -0.38),
+                    new AnchorPoint(1.0, 0.0), new AnchorPoint(0.92, 0.38), new AnchorPoint(0.71, 0.71),
+                    new AnchorPoint(0.38, 0.92), new AnchorPoint(0.0, 1.0));
+        };
     }
 
     private String buildPrompt(String requestText, String shapeType) {

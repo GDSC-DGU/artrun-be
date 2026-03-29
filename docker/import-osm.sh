@@ -20,16 +20,16 @@ else
     echo "[1/4] OSM file already exists, skipping download."
 fi
 
-# Step 2: Filter pedestrian ways using osmium
+# Step 2: Filter pedestrian ways using osmium and convert to XML
 echo "[2/4] Filtering pedestrian-friendly ways..."
-FILTERED_FILE="pedestrian_${OSM_FILE}"
+FILTERED_FILE="pedestrian.osm"
 if command -v osmium &> /dev/null; then
     osmium tags-filter "$OSM_FILE" \
         w/highway=footway,pedestrian,path,residential,living_street,service,track,steps,cycleway,unclassified,tertiary,secondary \
-        -o "$FILTERED_FILE" --overwrite
+        -o "$FILTERED_FILE" -f osm --overwrite
 else
-    echo "osmium not found, using original file."
-    FILTERED_FILE="$OSM_FILE"
+    echo "osmium not found, converting original file to XML..."
+    osmium cat "$OSM_FILE" -o "$FILTERED_FILE" -f osm --overwrite 2>/dev/null || FILTERED_FILE="$OSM_FILE"
 fi
 
 # Step 3: Import into PostgreSQL with osm2pgrouting
@@ -49,12 +49,16 @@ echo "[4/4] Creating indexes and verifying..."
 psql -h "$DB_HOST" -p "$DB_PORT" -U "$DB_USER" -d "$DB_NAME" << 'SQL'
 CREATE INDEX IF NOT EXISTS idx_ways_the_geom ON ways USING GIST (the_geom);
 CREATE INDEX IF NOT EXISTS idx_ways_vertices_the_geom ON ways_vertices_pgr USING GIST (the_geom);
+CREATE INDEX IF NOT EXISTS idx_ways_source ON ways (source);
+CREATE INDEX IF NOT EXISTS idx_ways_target ON ways (target);
+CREATE INDEX IF NOT EXISTS idx_ways_source_target ON ways (source, target);
+CREATE INDEX IF NOT EXISTS idx_ways_tag_id ON ways (tag_id);
+ANALYZE ways;
+ANALYZE ways_vertices_pgr;
 
 SELECT 'ways' AS table_name, count(*) FROM ways
 UNION ALL
 SELECT 'vertices', count(*) FROM ways_vertices_pgr;
-
-SELECT pgr_analyzeGraph('ways', 0.000001, 'the_geom', 'gid');
 SQL
 
 echo "=== OSM Import Complete ==="

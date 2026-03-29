@@ -20,6 +20,8 @@ import org.locationtech.jts.geom.Point;
 import org.locationtech.jts.geom.PrecisionModel;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 
 import java.util.Arrays;
 import java.util.List;
@@ -55,7 +57,13 @@ public class RouteService {
 
         RouteTask saved = routeTaskRepository.save(task);
 
-        orchestrator.executeAsync(saved.getId());
+        // 트랜잭션 커밋 후 비동기 실행 (커밋 전 실행 시 task 조회 실패)
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                orchestrator.executeAsync(saved.getId());
+            }
+        });
 
         return TaskResponse.builder()
                 .taskId(saved.getId())

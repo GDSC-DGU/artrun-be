@@ -13,15 +13,15 @@ import java.util.List;
 @AllArgsConstructor
 public class SaveRecordRequest {
 
-    @NotBlank
+    @NotBlank(message = "세션 ID를 입력해주세요.")
     private String sessionId;
 
     private String routeId;
 
-    @NotNull
+    @NotNull(message = "GPS 데이터를 입력해주세요.")
     private List<GpsPoint> gpsPoints;
 
-    @NotNull
+    @NotNull(message = "총 운동 시간을 입력해주세요.")
     private Integer totalTimeSeconds;
 
     @Getter

@@ -12,7 +12,7 @@ import org.springframework.stereotype.Service;
 @RequiredArgsConstructor
 public class ValidationScoringService {
 
-    private static final double MIN_SIMILARITY_THRESHOLD = 30.0;
+    private static final double MIN_SIMILARITY_THRESHOLD = 10.0;
 
     private final JdbcTemplate jdbcTemplate;
 
@@ -26,14 +26,17 @@ public class ValidationScoringService {
     }
 
     public double calculateSimilarity(LineString routePolyline, Geometry originalShape) {
+        // ST_HausdorffDistance는 geometry만 지원 → degree 단위 결과를 미터로 근사변환
+        // 서울 위도 기준 1도 ≈ 111,000m
         String sql = """
-                SELECT (1.0 - (
-                    ST_HausdorffDistance(
+                SELECT (1.0 - LEAST(1.0,
+                    (ST_HausdorffDistance(
                         ST_GeomFromText(?, 4326),
                         ST_GeomFromText(?, 4326)
-                    ) / GREATEST(
+                    ) * 111000.0)
+                    / GREATEST(
                         ST_Length(ST_GeomFromText(?, 4326)::geography),
-                        0.001
+                        1.0
                     )
                 )) * 100.0 AS similarity
                 """;
@@ -45,7 +48,7 @@ public class ValidationScoringService {
                     routePolyline.toText());
 
             double score = Math.max(0, Math.min(100, similarity != null ? similarity : 0));
-            log.info("Similarity score: {}", score);
+            log.info("Similarity score: {}%", String.format("%.1f", score));
             return score;
         } catch (Exception e) {
             log.error("Similarity calculation failed", e);

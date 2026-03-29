@@ -33,6 +33,7 @@ public class RouteTask {
 
     private Boolean avoidMainRoad;
     private Boolean preferPark;
+    @Column(columnDefinition = "TEXT")
     private String errorMessage;
 
     @Column(nullable = false, updatable = false)

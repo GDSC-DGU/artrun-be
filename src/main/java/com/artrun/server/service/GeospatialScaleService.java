@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.locationtech.jts.geom.*;
 import org.springframework.stereotype.Service;
 
+import java.util.ArrayList;
 import java.util.List;
 
 @Slf4j
@@ -68,6 +69,28 @@ public class GeospatialScaleService {
 
     public Point createPoint(double lat, double lng) {
         return GEOMETRY_FACTORY.createPoint(new Coordinate(lng, lat));
+    }
+
+    /**
+     * 앵커 포인트 사이에 중간 보간점을 삽입하여 도형 윤곽을 촘촘하게 만든다.
+     * 포인트 간 간격이 maxSpacingMeters 이하가 될 때까지 분할.
+     */
+    public Coordinate[] interpolate(Coordinate[] coords, double maxSpacingMeters) {
+        List<Coordinate> result = new ArrayList<>();
+        for (int i = 0; i < coords.length - 1; i++) {
+            result.add(coords[i]);
+            double dist = haversineDistance(coords[i].y, coords[i].x, coords[i + 1].y, coords[i + 1].x);
+            int segments = Math.max(1, (int) Math.ceil(dist / maxSpacingMeters));
+            for (int s = 1; s < segments; s++) {
+                double t = (double) s / segments;
+                double lng = coords[i].x + t * (coords[i + 1].x - coords[i].x);
+                double lat = coords[i].y + t * (coords[i + 1].y - coords[i].y);
+                result.add(new Coordinate(lng, lat));
+            }
+        }
+        result.add(coords[coords.length - 1]);
+        log.info("Interpolated {} -> {} points (maxSpacing={}m)", coords.length, result.size(), maxSpacingMeters);
+        return result.toArray(new Coordinate[0]);
     }
 
     private double calculatePerimeter(List<AnchorPoint> points) {

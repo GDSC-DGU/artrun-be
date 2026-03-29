@@ -21,45 +21,39 @@ import java.util.Map;
 public class RoutingEngineService {
 
     private static final GeometryFactory GEOMETRY_FACTORY = new GeometryFactory(new PrecisionModel(), 4326);
+    private static final double[] BBOX_MARGINS = {0.02, 0.05, 0.1};
 
     private final JdbcTemplate jdbcTemplate;
 
     public LineString buildRoute(List<Long> nodeIds, boolean avoidMainRoad, boolean preferPark) {
-        log.info("Building route through {} nodes", nodeIds.size());
+        log.info("Building route through {} nodes via A*", nodeIds.size());
 
+        double[] bbox = getBoundingBox(nodeIds);
         List<Coordinate> allCoords = new ArrayList<>();
 
         for (int i = 0; i < nodeIds.size() - 1; i++) {
             Long source = nodeIds.get(i);
             Long target = nodeIds.get(i + 1);
 
-            List<Coordinate> segment = findShortestPath(source, target, avoidMainRoad, preferPark);
-            if (segment.isEmpty()) {
-                segment = findShortestPathFallback(source, target);
-            }
+            List<Coordinate> segment = findPathWithExpandingBbox(source, target, avoidMainRoad, bbox);
 
             if (segment.isEmpty()) {
-                log.warn("No path found between nodes {} and {}", source, target);
+                log.warn("No road path found between nodes {} and {}, skipping", source, target);
                 continue;
             }
 
-            // 이전 세그먼트의 마지막 좌표와 현재 세그먼트 첫 좌표 중복 제거
             if (!allCoords.isEmpty() && !segment.isEmpty()) {
                 segment = segment.subList(1, segment.size());
             }
             allCoords.addAll(segment);
         }
 
-        // 폐곡선으로 만들기: 마지막 노드 → 첫 노드 연결
+        // 폐곡선: 마지막 → 첫 노드
         if (nodeIds.size() > 2) {
-            Long lastNode = nodeIds.getLast();
-            Long firstNode = nodeIds.getFirst();
-            List<Coordinate> closingSegment = findShortestPath(lastNode, firstNode, avoidMainRoad, preferPark);
-            if (closingSegment.isEmpty()) {
-                closingSegment = findShortestPathFallback(lastNode, firstNode);
-            }
-            if (!closingSegment.isEmpty() && !allCoords.isEmpty()) {
-                allCoords.addAll(closingSegment.subList(1, closingSegment.size()));
+            List<Coordinate> closing = findPathWithExpandingBbox(
+                    nodeIds.getLast(), nodeIds.getFirst(), avoidMainRoad, bbox);
+            if (!closing.isEmpty() && !allCoords.isEmpty()) {
+                allCoords.addAll(closing.subList(1, closing.size()));
             }
         }
 
@@ -76,38 +70,79 @@ public class RoutingEngineService {
         return jdbcTemplate.queryForObject(sql, Double.class, route.toText());
     }
 
-    private List<Coordinate> findShortestPath(Long source, Long target, boolean avoidMainRoad, boolean preferPark) {
-        String costColumn = buildCostExpression(avoidMainRoad, preferPark);
+    private List<Coordinate> findPathWithExpandingBbox(Long source, Long target,
+                                                       boolean avoidMainRoad, double[] baseBbox) {
+        for (double margin : BBOX_MARGINS) {
+            double[] expanded = {
+                    baseBbox[0] - margin, baseBbox[1] - margin,
+                    baseBbox[2] + margin, baseBbox[3] + margin
+            };
+
+            // A* 시도
+            List<Coordinate> result = findAStarPath(source, target, avoidMainRoad, expanded);
+            if (!result.isEmpty()) return result;
+
+            // A* 실패 시 Dijkstra 폴백 (코스트 없이)
+            result = findDijkstraPath(source, target, expanded);
+            if (!result.isEmpty()) return result;
+        }
+        return List.of();
+    }
+
+    private List<Coordinate> findAStarPath(Long source, Long target, boolean avoidMainRoad, double[] bbox) {
+        String costExpr = buildCostExpression(avoidMainRoad);
+        String bboxFilter = bboxWhere(bbox);
+
+        // pgr_aStar는 x1,y1,x2,y2 컬럼 필요 (휴리스틱용)
+        String innerSql = ("SELECT gid AS id, source, target, " +
+                "%s AS cost, %s AS reverse_cost, x1, y1, x2, y2 FROM ways WHERE %s")
+                .formatted(costExpr, costExpr, bboxFilter);
 
         String sql = """
                 SELECT ST_X(v.the_geom) AS lng, ST_Y(v.the_geom) AS lat
-                FROM pgr_dijkstra(
-                    'SELECT gid AS id, source, target, %s AS cost, %s AS reverse_cost FROM ways',
-                    ?, ?
-                ) AS r
+                FROM pgr_aStar('%s', ?, ?) AS r
                 JOIN ways_vertices_pgr v ON r.node = v.id
                 WHERE r.node > 0
                 ORDER BY r.seq
-                """.formatted(costColumn, costColumn);
+                """.formatted(innerSql.replace("'", "''"));
 
-        return executePathQuery(sql, source, target);
+        return executeQuery(sql, source, target);
     }
 
-    private List<Coordinate> findShortestPathFallback(Long source, Long target) {
+    private List<Coordinate> findDijkstraPath(Long source, Long target, double[] bbox) {
+        String innerSql = "SELECT gid AS id, source, target, cost, reverse_cost FROM ways WHERE %s"
+                .formatted(bboxWhere(bbox));
+
         String sql = """
                 SELECT ST_X(v.the_geom) AS lng, ST_Y(v.the_geom) AS lat
-                FROM pgr_dijkstra(
-                    'SELECT gid AS id, source, target, cost, reverse_cost FROM ways',
-                    ?, ?
-                ) AS r
+                FROM pgr_dijkstra('%s', ?, ?) AS r
                 JOIN ways_vertices_pgr v ON r.node = v.id
                 WHERE r.node > 0
                 ORDER BY r.seq
-                """;
-        return executePathQuery(sql, source, target);
+                """.formatted(innerSql.replace("'", "''"));
+
+        return executeQuery(sql, source, target);
     }
 
-    private List<Coordinate> executePathQuery(String sql, Long source, Long target) {
+    private double[] getBoundingBox(List<Long> nodeIds) {
+        String ids = nodeIds.stream().map(String::valueOf).reduce((a, b) -> a + "," + b).orElse("0");
+        String sql = "SELECT ST_XMin(ST_Extent(the_geom)) as xmin, ST_YMin(ST_Extent(the_geom)) as ymin, " +
+                     "ST_XMax(ST_Extent(the_geom)) as xmax, ST_YMax(ST_Extent(the_geom)) as ymax " +
+                     "FROM ways_vertices_pgr WHERE id IN (" + ids + ")";
+        Map<String, Object> row = jdbcTemplate.queryForMap(sql);
+        return new double[]{
+                ((Number) row.get("xmin")).doubleValue(),
+                ((Number) row.get("ymin")).doubleValue(),
+                ((Number) row.get("xmax")).doubleValue(),
+                ((Number) row.get("ymax")).doubleValue()
+        };
+    }
+
+    private String bboxWhere(double[] bbox) {
+        return "the_geom && ST_MakeEnvelope(%f,%f,%f,%f,4326)".formatted(bbox[0], bbox[1], bbox[2], bbox[3]);
+    }
+
+    private List<Coordinate> executeQuery(String sql, Long source, Long target) {
         try {
             List<Map<String, Object>> rows = jdbcTemplate.queryForList(sql, source, target);
             return rows.stream()
@@ -121,7 +156,7 @@ public class RoutingEngineService {
         }
     }
 
-    private String buildCostExpression(boolean avoidMainRoad, boolean preferPark) {
+    private String buildCostExpression(boolean avoidMainRoad) {
         if (avoidMainRoad) {
             return "CASE WHEN tag_id IN (111, 112) THEN cost * 5.0 " +
                    "WHEN tag_id IN (101, 102, 103) THEN cost * 0.5 " +
