@@ -21,7 +21,7 @@ import java.util.List;
 public class MapboxMapMatchingService {
 
     private static final GeometryFactory GF = new GeometryFactory(new PrecisionModel(), 4326);
-    private static final int MAX_COORDINATES_PER_REQUEST = 100;
+    private static final int MAX_WAYPOINTS_PER_REQUEST = 25;
 
     private final String apiKey;
     private final ObjectMapper objectMapper;
@@ -39,85 +39,87 @@ public class MapboxMapMatchingService {
         return apiKey != null && !apiKey.isBlank();
     }
 
-    /**
-     * 좌표열을 Mapbox Map Matching API로 도로에 매칭하여 경로를 반환한다.
-     * 입력: 도형 윤곽을 따르는 촘촘한 좌표열 (lat/lng)
-     * 출력: 도로를 따라가는 LineString
-     */
     public LineString matchToRoads(Coordinate[] coordinates) {
-        log.info("Mapbox Map Matching: {} coordinates", coordinates.length);
+        log.info("Mapbox Directions: {} input coordinates", coordinates.length);
 
-        List<Coordinate> allMatched = new ArrayList<>();
+        Coordinate[] waypoints = selectWaypoints(coordinates);
+        log.info("Selected {} waypoints", waypoints.length);
 
-        // Mapbox는 한 번에 최대 100좌표 → 청크로 분할
-        for (int start = 0; start < coordinates.length; start += MAX_COORDINATES_PER_REQUEST - 1) {
-            int end = Math.min(start + MAX_COORDINATES_PER_REQUEST, coordinates.length);
+        List<Coordinate> allCoords = new ArrayList<>();
+
+        for (int start = 0; start < waypoints.length - 1; start += MAX_WAYPOINTS_PER_REQUEST - 1) {
+            int end = Math.min(start + MAX_WAYPOINTS_PER_REQUEST, waypoints.length);
             Coordinate[] chunk = new Coordinate[end - start];
-            System.arraycopy(coordinates, start, chunk, 0, end - start);
+            System.arraycopy(waypoints, start, chunk, 0, end - start);
 
-            List<Coordinate> matched = callMapMatchingApi(chunk);
+            List<Coordinate> segment = callDirectionsApi(chunk);
+            if (segment.isEmpty()) continue;
 
-            if (!allMatched.isEmpty() && !matched.isEmpty()) {
-                matched = matched.subList(1, matched.size());
+            if (!allCoords.isEmpty()) {
+                segment = segment.subList(1, segment.size());
             }
-            allMatched.addAll(matched);
+            allCoords.addAll(segment);
         }
 
-        if (allMatched.size() < 2) {
-            throw new BusinessException(ErrorCode.ROUTING_FAILED, "Mapbox Map Matching 실패: 매칭된 좌표가 부족합니다.");
+        // 폐곡선: 마지막 → 첫 웨이포인트
+        if (waypoints.length > 2) {
+            List<Coordinate> closing = callDirectionsApi(
+                    new Coordinate[]{waypoints[waypoints.length - 1], waypoints[0]});
+            if (!closing.isEmpty() && !allCoords.isEmpty()) {
+                allCoords.addAll(closing.subList(1, closing.size()));
+            }
         }
 
-        log.info("Mapbox matched: {} -> {} coordinates", coordinates.length, allMatched.size());
-        return GF.createLineString(allMatched.toArray(new Coordinate[0]));
+        if (allCoords.size() < 2) {
+            throw new BusinessException(ErrorCode.ROUTING_FAILED, "Mapbox 경로 생성 실패");
+        }
+
+        log.info("Mapbox route: {} coordinates", allCoords.size());
+        return GF.createLineString(allCoords.toArray(new Coordinate[0]));
     }
 
-    private List<Coordinate> callMapMatchingApi(Coordinate[] coordinates) {
-        // coordinates는 JTS 형식 (x=lng, y=lat)
+    private Coordinate[] selectWaypoints(Coordinate[] coords) {
+        int maxTotal = MAX_WAYPOINTS_PER_REQUEST * 2 - 1; // 49
+        if (coords.length <= maxTotal) return coords;
+
+        double step = (double) (coords.length - 1) / (maxTotal - 1);
+        Coordinate[] selected = new Coordinate[maxTotal];
+        for (int i = 0; i < maxTotal; i++) {
+            selected[i] = coords[Math.min((int) Math.round(i * step), coords.length - 1)];
+        }
+        return selected;
+    }
+
+    private List<Coordinate> callDirectionsApi(Coordinate[] waypoints) {
         StringBuilder coordStr = new StringBuilder();
-        StringBuilder radiuses = new StringBuilder();
-        for (int i = 0; i < coordinates.length; i++) {
-            if (i > 0) {
-                coordStr.append(";");
-                radiuses.append(";");
-            }
-            coordStr.append(coordinates[i].x).append(",").append(coordinates[i].y);
-            radiuses.append("25"); // 25m 반경 내 도로 매칭
+        for (int i = 0; i < waypoints.length; i++) {
+            if (i > 0) coordStr.append(";");
+            coordStr.append(waypoints[i].x).append(",").append(waypoints[i].y);
         }
 
-        String url = "https://api.mapbox.com/matching/v5/mapbox/walking/%s?access_token=%s&geometries=geojson&radiuses=%s&overview=full"
-                .formatted(coordStr, apiKey, radiuses);
+        String url = "https://api.mapbox.com/directions/v5/mapbox/walking/%s?access_token=%s&geometries=geojson&overview=full&continue_straight=true"
+                .formatted(coordStr, apiKey);
 
         try {
-            String response = restClient.get()
-                    .uri(url)
-                    .retrieve()
-                    .body(String.class);
-
+            String response = restClient.get().uri(url).retrieve().body(String.class);
             JsonNode root = objectMapper.readTree(response);
-            String code = root.path("code").asText();
 
-            if (!"Ok".equals(code)) {
-                log.warn("Mapbox Map Matching returned: {}", code);
+            if (!"Ok".equals(root.path("code").asText())) {
+                log.warn("Mapbox: {}", root.path("message").asText());
                 return List.of();
             }
 
-            JsonNode matchings = root.path("matchings");
-            if (matchings.isEmpty()) {
-                return List.of();
-            }
+            JsonNode routes = root.path("routes");
+            if (routes.isEmpty()) return List.of();
 
-            // 첫 번째 매칭 결과의 geometry 좌표 추출
-            JsonNode coords = matchings.path(0).path("geometry").path("coordinates");
+            JsonNode coords = routes.path(0).path("geometry").path("coordinates");
             List<Coordinate> result = new ArrayList<>();
-            for (JsonNode point : coords) {
-                double lng = point.path(0).asDouble();
-                double lat = point.path(1).asDouble();
-                result.add(new Coordinate(lng, lat));
+            for (JsonNode pt : coords) {
+                result.add(new Coordinate(pt.path(0).asDouble(), pt.path(1).asDouble()));
             }
-
             return result;
         } catch (Exception e) {
-            log.error("Mapbox API call failed: {}", e.getMessage());
+            log.error("Mapbox API failed: {}", e.getMessage());
             return List.of();
         }
     }
