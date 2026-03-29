@@ -1,8 +1,7 @@
 name: Deploy to GCP Cloud Run
 
 on:
-  push:
-    branches: [ main ]
+  workflow_dispatch:  # 수동 트리거 (GCP 설정 완료 후 사용)
 
 env:
   PROJECT_ID: ${{ secrets.GCP_PROJECT_ID }}
@@ -72,6 +71,7 @@ jobs:
             --allow-unauthenticated \
             --set-env-vars "SPRING_PROFILES_ACTIVE=prod" \
             --set-env-vars "GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}" \
+            --set-env-vars "MAPBOX_API_KEY=${{ secrets.MAPBOX_API_KEY }}" \
             --set-env-vars "DB_HOST=${{ secrets.DB_HOST }}" \
             --set-env-vars "DB_PORT=${{ secrets.DB_PORT }}" \
             --set-env-vars "DB_NAME=${{ secrets.DB_NAME }}" \
