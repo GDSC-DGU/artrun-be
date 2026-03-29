@@ -70,16 +70,16 @@ class ValidationScoringServiceTest {
     }
 
     @Test
-    @DisplayName("유사도 30 이상이면 최소 품질 충족")
+    @DisplayName("유사도 10 이상이면 최소 품질 충족")
     void meetsMinimumQuality_above() {
-        assertThat(service.meetsMinimumQuality(30.0)).isTrue();
+        assertThat(service.meetsMinimumQuality(10.0)).isTrue();
         assertThat(service.meetsMinimumQuality(50.0)).isTrue();
     }
 
     @Test
-    @DisplayName("유사도 30 미만이면 최소 품질 미달")
+    @DisplayName("유사도 10 미만이면 최소 품질 미달")
     void meetsMinimumQuality_below() {
-        assertThat(service.meetsMinimumQuality(29.9)).isFalse();
+        assertThat(service.meetsMinimumQuality(9.9)).isFalse();
         assertThat(service.meetsMinimumQuality(0.0)).isFalse();
     }
 }

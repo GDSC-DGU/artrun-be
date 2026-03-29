@@ -30,6 +30,7 @@ public class RouteGenerationOrchestrator {
     private final ShapeEngineService shapeEngineService;
     private final GeospatialScaleService geospatialScaleService;
     private final MapMatchingService mapMatchingService;
+    private final MapboxMapMatchingService mapboxService;
     private final RoutingEngineService routingEngineService;
     private final ValidationScoringService validationScoringService;
     private final RouteRepository routeRepository;
@@ -110,15 +111,25 @@ public class RouteGenerationOrchestrator {
                 points, lat, lng, task.getTargetDistanceKm());
         Geometry originalShape = geospatialScaleService.createGeometry(scaledCoords);
 
-        // 2.5. Interpolation - 앵커 포인트 사이에 100m 간격으로 중간점 삽입
-        Coordinate[] denseCoords = geospatialScaleService.interpolate(scaledCoords, 100.0);
+        // 2.5. Interpolation - 앵커 포인트 사이에 중간점 삽입
+        Coordinate[] denseCoords = geospatialScaleService.interpolate(scaledCoords,
+                mapboxService.isAvailable() ? 30.0 : 100.0);
 
-        // 3. Map Matching - 촘촘한 점들을 도로에 스냅
-        List<Long> nodeIds = mapMatchingService.snapToOsmNodes(denseCoords);
+        LineString routePolyline;
+        double distanceMeters;
 
-        // 4. Routing Engine
-        LineString routePolyline = routingEngineService.buildRoute(nodeIds, avoidMainRoad, preferPark);
-        double distanceMeters = routingEngineService.calculateRouteDistance(routePolyline);
+        if (mapboxService.isAvailable()) {
+            // 3+4. Mapbox Map Matching - 도형 윤곽을 도로에 직접 매칭
+            log.info("Using Mapbox Map Matching for road matching");
+            routePolyline = mapboxService.matchToRoads(denseCoords);
+            distanceMeters = routingEngineService.calculateRouteDistance(routePolyline);
+        } else {
+            // 3. OSM Node Snap + 4. pgRouting 폴백
+            log.info("Using pgRouting fallback (Mapbox not configured)");
+            List<Long> nodeIds = mapMatchingService.snapToOsmNodes(denseCoords);
+            routePolyline = routingEngineService.buildRoute(nodeIds, avoidMainRoad, preferPark);
+            distanceMeters = routingEngineService.calculateRouteDistance(routePolyline);
+        }
 
         // 5. Validation & Scoring
         validationScoringService.validateRoute(routePolyline);
