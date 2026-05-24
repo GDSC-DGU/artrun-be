@@ -2,6 +2,7 @@ package com.artrun.server.dto.request;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -19,6 +20,7 @@ public class SaveRecordRequest {
     private String routeId;
 
     @NotNull(message = "GPS 데이터를 입력해주세요.")
+    @Size(min = 2, message = "GPS 경로는 최소 2개 지점이 필요합니다.")
     private List<GpsPoint> gpsPoints;
 
     @NotNull(message = "총 운동 시간을 입력해주세요.")

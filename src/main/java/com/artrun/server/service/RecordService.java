@@ -35,6 +35,10 @@ public class RecordService {
         RunSession session = runSessionRepository.findById(request.getSessionId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.SESSION_NOT_FOUND));
 
+        if (session.getStatus() != SessionStatus.ACTIVE) {
+            throw new BusinessException(ErrorCode.SESSION_INACTIVE);
+        }
+
         // 세션 완료 처리
         session.setStatus(SessionStatus.COMPLETED);
         session.setFinishedAt(LocalDateTime.now());
@@ -48,6 +52,7 @@ public class RecordService {
 
         // 총 거리 계산
         Double totalDistance = calculateDistance(correctedPolyline);
+        if (totalDistance == null) totalDistance = 0.0;
 
         // 평균 속도 계산 (m/s)
         Double avgSpeed = request.getTotalTimeSeconds() > 0

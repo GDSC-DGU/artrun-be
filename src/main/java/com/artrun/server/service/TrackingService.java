@@ -4,6 +4,7 @@ import com.artrun.server.common.BusinessException;
 import com.artrun.server.common.ErrorCode;
 import com.artrun.server.domain.Route;
 import com.artrun.server.domain.RunSession;
+import com.artrun.server.domain.SessionStatus;
 import com.artrun.server.dto.response.TrackResponse;
 import com.artrun.server.repository.RunSessionRepository;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,10 @@ public class TrackingService {
     public TrackResponse checkPosition(String sessionId, double lat, double lng) {
         RunSession session = runSessionRepository.findById(sessionId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.SESSION_NOT_FOUND));
+
+        if (session.getStatus() != SessionStatus.ACTIVE) {
+            throw new BusinessException(ErrorCode.SESSION_INACTIVE);
+        }
 
         Route route = session.getRoute();
         if (route == null || route.getPolyline() == null) {

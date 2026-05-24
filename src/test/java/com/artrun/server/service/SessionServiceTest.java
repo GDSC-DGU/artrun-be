@@ -42,6 +42,7 @@ class SessionServiceTest {
                 .id("session-1").route(route).status(SessionStatus.ACTIVE).build();
 
         when(routeRepository.findById("route-1")).thenReturn(Optional.of(route));
+        when(runSessionRepository.existsByRoute_IdAndStatus("route-1", SessionStatus.ACTIVE)).thenReturn(false);
         when(runSessionRepository.save(any())).thenReturn(session);
 
         SessionResponse response = sessionService.startSession(new StartSessionRequest("route-1"));
@@ -56,6 +57,17 @@ class SessionServiceTest {
         when(routeRepository.findById("invalid")).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> sessionService.startSession(new StartSessionRequest("invalid")))
+                .isInstanceOf(BusinessException.class);
+    }
+
+    @Test
+    @DisplayName("이미 활성 세션이 있으면 예외를 던진다")
+    void startSession_duplicateActive() {
+        Route route = Route.builder().id("route-1").build();
+        when(routeRepository.findById("route-1")).thenReturn(Optional.of(route));
+        when(runSessionRepository.existsByRoute_IdAndStatus("route-1", SessionStatus.ACTIVE)).thenReturn(true);
+
+        assertThatThrownBy(() -> sessionService.startSession(new StartSessionRequest("route-1")))
                 .isInstanceOf(BusinessException.class);
     }
 }

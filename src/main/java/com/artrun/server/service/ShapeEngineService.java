@@ -6,6 +6,7 @@ import com.artrun.server.dto.AnchorPoint;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
+import org.springframework.http.client.SimpleClientHttpRequestFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestClient;
 import tools.jackson.core.type.TypeReference;
@@ -30,7 +31,10 @@ public class ShapeEngineService {
         this.apiKey = apiKey;
         this.modelName = modelName;
         this.objectMapper = objectMapper;
-        this.restClient = RestClient.create();
+        SimpleClientHttpRequestFactory factory = new SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(10_000);
+        factory.setReadTimeout(30_000);
+        this.restClient = RestClient.builder().requestFactory(factory).build();
     }
 
     public List<AnchorPoint> generateShapeCoordinates(String requestText, String shapeType) {

@@ -23,6 +23,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
+import java.util.concurrent.RejectedExecutionException;
+
 import java.util.Arrays;
 import java.util.List;
 
@@ -34,6 +36,7 @@ public class RouteService {
     private final RouteTaskRepository routeTaskRepository;
     private final RouteRepository routeRepository;
     private final RouteGenerationOrchestrator orchestrator;
+    private final TaskService taskService;
 
     private static final GeometryFactory GEOMETRY_FACTORY = new GeometryFactory(new PrecisionModel(), 4326);
 
@@ -61,7 +64,12 @@ public class RouteService {
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
-                orchestrator.executeAsync(saved.getId());
+                try {
+                    orchestrator.executeAsync(saved.getId());
+                } catch (RejectedExecutionException e) {
+                    log.error("Route generation queue is full, task {} will be marked as FAILED", saved.getId());
+                    taskService.markFailed(saved.getId(), "서버 처리 대기열이 가득 찼습니다. 잠시 후 다시 시도해주세요.");
+                }
             }
         });
 

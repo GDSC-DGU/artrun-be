@@ -29,6 +29,10 @@ public class SessionService {
         Route route = routeRepository.findById(request.getRouteId())
                 .orElseThrow(() -> new BusinessException(ErrorCode.ROUTE_NOT_FOUND));
 
+        if (runSessionRepository.existsByRoute_IdAndStatus(request.getRouteId(), SessionStatus.ACTIVE)) {
+            throw new BusinessException(ErrorCode.SESSION_ALREADY_ACTIVE);
+        }
+
         RunSession session = RunSession.builder()
                 .route(route)
                 .status(SessionStatus.ACTIVE)

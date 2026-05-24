@@ -1,6 +1,8 @@
 package com.artrun.server.dto.request;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.DecimalMax;
+import jakarta.validation.constraints.DecimalMin;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
@@ -34,8 +36,15 @@ public class RouteGenerateRequest {
     @NoArgsConstructor
     @AllArgsConstructor
     public static class StartPointDto {
-        @NotNull private Double lat;
-        @NotNull private Double lng;
+        @NotNull
+        @DecimalMin(value = "-90.0", message = "위도는 -90 이상이어야 합니다.")
+        @DecimalMax(value = "90.0", message = "위도는 90 이하여야 합니다.")
+        private Double lat;
+
+        @NotNull
+        @DecimalMin(value = "-180.0", message = "경도는 -180 이상이어야 합니다.")
+        @DecimalMax(value = "180.0", message = "경도는 180 이하여야 합니다.")
+        private Double lng;
     }
 
     @Getter

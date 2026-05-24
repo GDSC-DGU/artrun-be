@@ -35,7 +35,7 @@ public class RoutingEngineService {
             Long source = nodeIds.get(i);
             Long target = nodeIds.get(i + 1);
 
-            List<Coordinate> segment = findPathWithExpandingBbox(source, target, avoidMainRoad, bbox);
+            List<Coordinate> segment = findPathWithExpandingBbox(source, target, avoidMainRoad, preferPark, bbox);
 
             if (segment.isEmpty()) {
                 log.warn("No road path found between nodes {} and {}, skipping", source, target);
@@ -51,7 +51,7 @@ public class RoutingEngineService {
         // 폐곡선: 마지막 → 첫 노드
         if (nodeIds.size() > 2) {
             List<Coordinate> closing = findPathWithExpandingBbox(
-                    nodeIds.getLast(), nodeIds.getFirst(), avoidMainRoad, bbox);
+                    nodeIds.getLast(), nodeIds.getFirst(), avoidMainRoad, preferPark, bbox);
             if (!closing.isEmpty() && !allCoords.isEmpty()) {
                 allCoords.addAll(closing.subList(1, closing.size()));
             }
@@ -71,7 +71,8 @@ public class RoutingEngineService {
     }
 
     private List<Coordinate> findPathWithExpandingBbox(Long source, Long target,
-                                                       boolean avoidMainRoad, double[] baseBbox) {
+                                                       boolean avoidMainRoad, boolean preferPark,
+                                                       double[] baseBbox) {
         for (double margin : BBOX_MARGINS) {
             double[] expanded = {
                     baseBbox[0] - margin, baseBbox[1] - margin,
@@ -79,7 +80,7 @@ public class RoutingEngineService {
             };
 
             // A* 시도
-            List<Coordinate> result = findAStarPath(source, target, avoidMainRoad, expanded);
+            List<Coordinate> result = findAStarPath(source, target, avoidMainRoad, preferPark, expanded);
             if (!result.isEmpty()) return result;
 
             // A* 실패 시 Dijkstra 폴백 (코스트 없이)
@@ -89,8 +90,9 @@ public class RoutingEngineService {
         return List.of();
     }
 
-    private List<Coordinate> findAStarPath(Long source, Long target, boolean avoidMainRoad, double[] bbox) {
-        String costExpr = buildCostExpression(avoidMainRoad);
+    private List<Coordinate> findAStarPath(Long source, Long target, boolean avoidMainRoad,
+                                           boolean preferPark, double[] bbox) {
+        String costExpr = buildCostExpression(avoidMainRoad, preferPark);
         String bboxFilter = bboxWhere(bbox);
 
         // pgr_aStar는 x1,y1,x2,y2 컬럼 필요 (휴리스틱용)
@@ -156,10 +158,17 @@ public class RoutingEngineService {
         }
     }
 
-    private String buildCostExpression(boolean avoidMainRoad) {
-        if (avoidMainRoad) {
+    private String buildCostExpression(boolean avoidMainRoad, boolean preferPark) {
+        if (avoidMainRoad && preferPark) {
+            return "CASE WHEN tag_id IN (111, 112) THEN cost * 5.0 " +
+                   "WHEN tag_id IN (101, 102, 103) THEN cost * 0.3 " +
+                   "ELSE cost * 0.7 END";
+        } else if (avoidMainRoad) {
             return "CASE WHEN tag_id IN (111, 112) THEN cost * 5.0 " +
                    "WHEN tag_id IN (101, 102, 103) THEN cost * 0.5 " +
+                   "ELSE cost END";
+        } else if (preferPark) {
+            return "CASE WHEN tag_id IN (101, 102, 103) THEN cost * 0.5 " +
                    "ELSE cost END";
         }
         return "cost";

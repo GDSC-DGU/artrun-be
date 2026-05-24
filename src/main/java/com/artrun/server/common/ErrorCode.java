@@ -22,6 +22,8 @@ public enum ErrorCode {
 
     // Session
     SESSION_NOT_FOUND(HttpStatus.NOT_FOUND, "해당 세션을 찾을 수 없습니다."),
+    SESSION_INACTIVE(HttpStatus.CONFLICT, "활성 상태의 세션이 아닙니다."),
+    SESSION_ALREADY_ACTIVE(HttpStatus.CONFLICT, "이미 해당 경로로 진행 중인 세션이 있습니다."),
 
     // AI
     AI_API_ERROR(HttpStatus.SERVICE_UNAVAILABLE, "AI 서비스 호출에 실패했습니다."),

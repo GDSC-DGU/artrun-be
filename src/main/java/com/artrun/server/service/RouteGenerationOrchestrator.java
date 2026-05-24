@@ -5,6 +5,7 @@ import com.artrun.server.domain.RouteTask;
 import com.artrun.server.domain.TaskStatus;
 import com.artrun.server.dto.AnchorPoint;
 import com.artrun.server.repository.RouteRepository;
+import com.artrun.server.repository.RouteTaskRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.locationtech.jts.geom.Coordinate;
@@ -12,7 +13,10 @@ import org.locationtech.jts.geom.Geometry;
 import org.locationtech.jts.geom.LineString;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
+
+import java.time.LocalDateTime;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -34,6 +38,8 @@ public class RouteGenerationOrchestrator {
     private final RoutingEngineService routingEngineService;
     private final ValidationScoringService validationScoringService;
     private final RouteRepository routeRepository;
+    private final RouteTaskRepository routeTaskRepository;
+    private final PlatformTransactionManager transactionManager;
 
     @Async("routeGenerationExecutor")
     public void executeAsync(String taskId) {
@@ -77,25 +83,32 @@ public class RouteGenerationOrchestrator {
                 throw new RuntimeException("모든 후보 경로 생성에 실패했습니다.");
             }
 
-            // 종합 점수로 정렬 후 저장
+            // 종합 점수로 정렬 후 단일 트랜잭션으로 저장 + 완료 처리
             candidates.sort(Comparator.comparingDouble(CandidateResult::compositeScore).reversed());
-            for (int rank = 0; rank < candidates.size(); rank++) {
-                CandidateResult c = candidates.get(rank);
-                Route route = Route.builder()
-                        .task(task)
-                        .polyline(c.polyline())
-                        .originalShape(c.originalShape())
-                        .distanceMeters(c.distanceMeters())
-                        .similarityScore(c.similarityScore())
-                        .pedestrianRoadRatio(c.pedestrianRatio())
-                        .ranking(rank + 1)
-                        .build();
-                routeRepository.save(route);
-                log.info("Route #{} saved: distance={}m, similarity={:.1f}, composite={:.1f}",
-                        rank + 1, (int) c.distanceMeters(), c.similarityScore(), c.compositeScore());
-            }
-
-            taskService.updateStatus(taskId, TaskStatus.COMPLETED);
+            final List<CandidateResult> sorted = List.copyOf(candidates);
+            new TransactionTemplate(transactionManager).executeWithoutResult(txStatus -> {
+                for (int rank = 0; rank < sorted.size(); rank++) {
+                    CandidateResult c = sorted.get(rank);
+                    Route route = Route.builder()
+                            .task(task)
+                            .polyline(c.polyline())
+                            .originalShape(c.originalShape())
+                            .distanceMeters(c.distanceMeters())
+                            .similarityScore(c.similarityScore())
+                            .pedestrianRoadRatio(c.pedestrianRatio())
+                            .ranking(rank + 1)
+                            .build();
+                    routeRepository.save(route);
+                    log.info("Route #{} saved: distance={}m, similarity={}%, composite={}",
+                            rank + 1, (int) c.distanceMeters(),
+                            String.format("%.1f", c.similarityScore()),
+                            String.format("%.1f", c.compositeScore()));
+                }
+                RouteTask t = routeTaskRepository.findById(taskId).orElseThrow();
+                t.setStatus(TaskStatus.COMPLETED);
+                t.setCompletedAt(LocalDateTime.now());
+                routeTaskRepository.save(t);
+            });
             log.info("Route generation completed: {} candidates for task {}", candidates.size(), taskId);
         } catch (Exception e) {
             log.error("Route generation failed for task: {}", taskId, e);
