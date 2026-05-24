@@ -9,6 +9,8 @@ import com.artrun.server.service.SessionService;
 import com.artrun.server.service.TrackingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -33,6 +35,16 @@ public class SessionController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "세션 생성 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "경로를 찾을 수 없음")
     })
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(
+        content = @Content(mediaType = "application/json", examples = @ExampleObject(
+            name = "세션 시작",
+            value = """
+                {
+                  "routeId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
+                }
+                """
+        ))
+    )
     @PostMapping("/api/v1/session/start")
     public ResponseEntity<ApiResponse<SessionResponse>> startSession(
             @Valid @RequestBody StartSessionRequest request) {
@@ -46,6 +58,19 @@ public class SessionController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "위치 검증 성공"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "세션을 찾을 수 없음")
     })
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(
+        content = @Content(mediaType = "application/json", examples = @ExampleObject(
+            name = "현재 위치 전송",
+            value = """
+                {
+                  "lat": 37.5670,
+                  "lng": 126.9785,
+                  "timestamp": 1716554400000,
+                  "currentSpeed": 2.5
+                }
+                """
+        ))
+    )
     @PostMapping("/api/v1/session/{sessionId}/track")
     public ResponseEntity<ApiResponse<TrackResponse>> track(
             @Parameter(description = "러닝 세션 ID") @PathVariable String sessionId,

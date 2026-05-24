@@ -7,6 +7,8 @@ import com.artrun.server.dto.response.TaskResponse;
 import com.artrun.server.service.RouteService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.media.Content;
+import io.swagger.v3.oas.annotations.media.ExampleObject;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
@@ -28,6 +30,27 @@ public class RouteController {
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "202", description = "경로 생성 작업이 시작됨"),
             @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "잘못된 요청")
     })
+    @io.swagger.v3.oas.annotations.parameters.RequestBody(
+        content = @Content(mediaType = "application/json", examples = @ExampleObject(
+            name = "별 모양 5km 경로",
+            value = """
+                {
+                  "requestText": "동대문 근처에서 별 모양으로 달리고 싶어요",
+                  "shapeType": "STAR",
+                  "activityType": "RUNNING",
+                  "targetDistanceKm": 5.0,
+                  "startPoint": {
+                    "lat": 37.5665,
+                    "lng": 126.9780
+                  },
+                  "preferences": {
+                    "avoidMainRoad": true,
+                    "preferPark": false
+                  }
+                }
+                """
+        ))
+    )
     @PostMapping("/generate")
     public ResponseEntity<ApiResponse<TaskResponse>> generateRoute(
             @Valid @RequestBody RouteGenerateRequest request) {
