@@ -28,6 +28,26 @@ gemini:
 mapbox:
   api-key: ${MAPBOX_API_KEY:}
 
+jwt:
+  secret: ${JWT_SECRET:artrun-super-secret-key-must-be-at-least-256-bits-long-for-hmac-sha}
+  access-token-expiration: 3600000      # 1시간
+  refresh-token-expiration: 1209600000  # 14일
+
+oauth:
+  kakao:
+    user-info-url: https://kapi.kakao.com/v2/user/me
+  google:
+    user-info-url: https://www.googleapis.com/oauth2/v3/userinfo
+
+aws:
+  s3:
+    bucket: ${S3_BUCKET:artrun-bucket}
+    region: ${AWS_REGION:ap-northeast-2}
+    base-url: ${S3_BASE_URL:https://artrun-bucket.s3.ap-northeast-2.amazonaws.com}
+  credentials:
+    access-key: ${AWS_ACCESS_KEY:}
+    secret-key: ${AWS_SECRET_KEY:}
+
 server:
   port: ${PORT:8080}
 

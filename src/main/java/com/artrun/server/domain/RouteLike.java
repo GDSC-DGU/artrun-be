@@ -6,13 +6,14 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "run_sessions")
+@Table(name = "route_likes", uniqueConstraints = {
+        @UniqueConstraint(columnNames = {"user_id", "community_route_id"})
+})
 @Getter
-@Setter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Builder
 @AllArgsConstructor
-public class RunSession {
+public class RouteLike {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
@@ -23,15 +24,8 @@ public class RunSession {
     private User user;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "route_id", nullable = false)
-    private Route route;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private SessionStatus status;
-
-    private LocalDateTime startedAt;
-    private LocalDateTime finishedAt;
+    @JoinColumn(name = "community_route_id", nullable = false)
+    private CommunityRoute communityRoute;
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -39,6 +33,5 @@ public class RunSession {
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
-        if (status == null) status = SessionStatus.ACTIVE;
     }
 }

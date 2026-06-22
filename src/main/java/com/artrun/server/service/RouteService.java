@@ -6,6 +6,7 @@ import com.artrun.server.domain.Route;
 import com.artrun.server.domain.RouteTask;
 import com.artrun.server.domain.TaskStatus;
 import com.artrun.server.dto.request.RouteGenerateRequest;
+import com.artrun.server.dto.response.RouteDetailResponse;
 import com.artrun.server.dto.response.RouteStatusResponse;
 import com.artrun.server.dto.response.RouteStatusResponse.CandidateRouteDto;
 import com.artrun.server.dto.response.RouteStatusResponse.LatLng;
@@ -23,10 +24,9 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
-import java.util.concurrent.RejectedExecutionException;
-
 import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.RejectedExecutionException;
 
 @Slf4j
 @Service
@@ -60,7 +60,6 @@ public class RouteService {
 
         RouteTask saved = routeTaskRepository.save(task);
 
-        // 트랜잭션 커밋 후 비동기 실행 (커밋 전 실행 시 task 조회 실패)
         TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
             @Override
             public void afterCommit() {
@@ -84,22 +83,87 @@ public class RouteService {
         RouteTask task = routeTaskRepository.findById(taskId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.TASK_NOT_FOUND));
 
-        var builder = RouteStatusResponse.builder()
-                .status(task.getStatus().name());
+        var builder = RouteStatusResponse.builder().status(task.getStatus().name());
 
         if (task.getStatus() == TaskStatus.FAILED) {
             builder.errorMessage(task.getErrorMessage());
         }
-
         if (task.getStatus() == TaskStatus.COMPLETED) {
             List<Route> routes = routeRepository.findByTaskIdOrderByRankingAsc(taskId);
-            List<CandidateRouteDto> candidates = routes.stream()
-                    .map(this::toDto)
-                    .toList();
-            builder.candidateRoutes(candidates);
+            builder.candidateRoutes(routes.stream().map(this::toDto).toList());
         }
 
         return builder.build();
+    }
+
+    @Transactional(readOnly = true)
+    public RouteDetailResponse getRoute(String routeId) {
+        Route route = routeRepository.findById(routeId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ROUTE_NOT_FOUND));
+
+        List<RouteDetailResponse.LatLng> polyline = route.getPolyline() != null
+                ? Arrays.stream(route.getPolyline().getCoordinates())
+                    .map(c -> RouteDetailResponse.LatLng.builder().lat(c.y).lng(c.x).build())
+                    .toList()
+                : List.of();
+
+        // 체크포인트: 전체 좌표 중 일정 간격으로 추출 (10% 단위)
+        List<RouteDetailResponse.LatLng> checkpoints = extractCheckpoints(polyline);
+
+        return RouteDetailResponse.builder()
+                .routeId(route.getId())
+                .distanceMeters(route.getDistanceMeters() != null ? route.getDistanceMeters() : 0)
+                .similarityScore(route.getSimilarityScore())
+                .pedestrianRoadRatio(route.getPedestrianRoadRatio())
+                .polyline(polyline)
+                .checkpoints(checkpoints)
+                .build();
+    }
+
+    @Transactional
+    public TaskResponse regenerateRoute(String routeId) {
+        Route original = routeRepository.findById(routeId)
+                .orElseThrow(() -> new BusinessException(ErrorCode.ROUTE_NOT_FOUND));
+
+        RouteTask originalTask = original.getTask();
+
+        RouteTask newTask = RouteTask.builder()
+                .status(TaskStatus.PENDING)
+                .requestText(originalTask.getRequestText())
+                .shapeType(originalTask.getShapeType())
+                .activityType(originalTask.getActivityType())
+                .targetDistanceKm(originalTask.getTargetDistanceKm())
+                .startPoint(originalTask.getStartPoint())
+                .avoidMainRoad(originalTask.getAvoidMainRoad())
+                .preferPark(originalTask.getPreferPark())
+                .build();
+
+        RouteTask saved = routeTaskRepository.save(newTask);
+
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                try {
+                    orchestrator.executeAsync(saved.getId());
+                } catch (RejectedExecutionException e) {
+                    taskService.markFailed(saved.getId(), "서버 처리 대기열이 가득 찼습니다.");
+                }
+            }
+        });
+
+        return TaskResponse.builder()
+                .taskId(saved.getId())
+                .message("새로운 경로 생성을 시작합니다.")
+                .build();
+    }
+
+    private List<RouteDetailResponse.LatLng> extractCheckpoints(List<RouteDetailResponse.LatLng> polyline) {
+        if (polyline.size() < 2) return polyline;
+        int step = Math.max(1, polyline.size() / 10);
+        return java.util.stream.IntStream.range(0, polyline.size())
+                .filter(i -> i % step == 0 || i == polyline.size() - 1)
+                .mapToObj(polyline::get)
+                .toList();
     }
 
     private CandidateRouteDto toDto(Route route) {

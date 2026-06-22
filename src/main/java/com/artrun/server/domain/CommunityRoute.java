@@ -6,32 +6,34 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "run_sessions")
+@Table(name = "community_routes")
 @Getter
 @Setter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Builder
 @AllArgsConstructor
-public class RunSession {
+public class CommunityRoute {
 
     @Id
     @GeneratedValue(strategy = GenerationType.UUID)
     private String id;
 
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "record_id", nullable = false, unique = true)
+    private RunRecord record;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "route_id", nullable = false)
-    private Route route;
-
-    @Enumerated(EnumType.STRING)
     @Column(nullable = false)
-    private SessionStatus status;
+    private String title;
 
-    private LocalDateTime startedAt;
-    private LocalDateTime finishedAt;
+    @Column(columnDefinition = "TEXT")
+    private String description;
+
+    @Column(nullable = false)
+    private int likeCount;
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -39,6 +41,6 @@ public class RunSession {
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
-        if (status == null) status = SessionStatus.ACTIVE;
+        likeCount = 0;
     }
 }

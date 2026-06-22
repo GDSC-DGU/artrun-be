@@ -3,15 +3,14 @@ package com.artrun.server.controller;
 import com.artrun.server.common.ApiResponse;
 import com.artrun.server.dto.request.StartSessionRequest;
 import com.artrun.server.dto.request.TrackRequest;
+import com.artrun.server.dto.response.SessionDetailResponse;
 import com.artrun.server.dto.response.SessionResponse;
 import com.artrun.server.dto.response.TrackResponse;
+import com.artrun.server.security.CustomUserDetails;
 import com.artrun.server.service.SessionService;
 import com.artrun.server.service.TrackingService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.ExampleObject;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -20,72 +19,84 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.messaging.handler.annotation.DestinationVariable;
 import org.springframework.messaging.handler.annotation.MessageMapping;
 import org.springframework.messaging.handler.annotation.SendTo;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-@Tag(name = "Session", description = "러닝 세션 관리 및 실시간 위치 추적 API")
+@Tag(name = "Session", description = "러닝 세션 관리 API")
 @RestController
+@RequestMapping("/api/v1/session")
 @RequiredArgsConstructor
 public class SessionController {
 
     private final TrackingService trackingService;
     private final SessionService sessionService;
 
-    @Operation(summary = "러닝 세션 시작", description = "선택한 경로로 러닝 세션을 생성하고 시작합니다.")
-    @ApiResponses({
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "201", description = "세션 생성 성공"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "경로를 찾을 수 없음")
-    })
-    @io.swagger.v3.oas.annotations.parameters.RequestBody(
-        content = @Content(mediaType = "application/json", examples = @ExampleObject(
-            name = "세션 시작",
-            value = """
-                {
-                  "routeId": "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-                }
-                """
-        ))
-    )
-    @PostMapping("/api/v1/session/start")
+    @Operation(summary = "러닝 세션 시작")
+    @PostMapping("/start")
     public ResponseEntity<ApiResponse<SessionResponse>> startSession(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
             @Valid @RequestBody StartSessionRequest request) {
-        SessionResponse response = sessionService.startSession(request);
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(ApiResponse.ok("러닝 세션이 시작되었습니다.", response));
+        SessionResponse response = sessionService.startSession(userDetails.getUserId(), request);
+        return ResponseEntity.status(HttpStatus.CREATED).body(ApiResponse.ok("러닝 세션이 시작되었습니다.", response));
     }
 
-    @Operation(summary = "실시간 위치 검증", description = "러닝 중 현재 GPS 위치를 전송하여 경로 이탈 여부와 남은 거리를 확인합니다.")
-    @ApiResponses({
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "위치 검증 성공"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "세션을 찾을 수 없음")
-    })
-    @io.swagger.v3.oas.annotations.parameters.RequestBody(
-        content = @Content(mediaType = "application/json", examples = @ExampleObject(
-            name = "현재 위치 전송",
-            value = """
-                {
-                  "lat": 37.5670,
-                  "lng": 126.9785,
-                  "timestamp": 1716554400000,
-                  "currentSpeed": 2.5
-                }
-                """
-        ))
-    )
-    @PostMapping("/api/v1/session/{sessionId}/track")
+    @Operation(summary = "실시간 위치 검증 및 러닝 안내 (1~3초 간격 호출)")
+    @PostMapping("/{sessionId}/track")
     public ResponseEntity<ApiResponse<TrackResponse>> track(
-            @Parameter(description = "러닝 세션 ID") @PathVariable String sessionId,
+            @Parameter(description = "세션 ID") @PathVariable String sessionId,
             @Valid @RequestBody TrackRequest request) {
-        TrackResponse response = trackingService.checkPosition(
-                sessionId, request.getLat(), request.getLng());
+        TrackResponse response = trackingService.checkPosition(sessionId, request.getLat(), request.getLng());
         return ResponseEntity.ok(ApiResponse.ok(response));
+    }
+
+    @Operation(summary = "러닝 세션 일시정지")
+    @PostMapping("/{sessionId}/pause")
+    public ResponseEntity<ApiResponse<Void>> pause(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable String sessionId) {
+        sessionService.pauseSession(userDetails.getUserId(), sessionId);
+        return ResponseEntity.ok(ApiResponse.ok("세션이 일시정지되었습니다.", null));
+    }
+
+    @Operation(summary = "러닝 세션 재개")
+    @PostMapping("/{sessionId}/resume")
+    public ResponseEntity<ApiResponse<Void>> resume(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable String sessionId) {
+        sessionService.resumeSession(userDetails.getUserId(), sessionId);
+        return ResponseEntity.ok(ApiResponse.ok("세션이 재개되었습니다.", null));
+    }
+
+    @Operation(summary = "러닝 세션 종료 (기록 저장 준비 상태로 전환)")
+    @PostMapping("/{sessionId}/finish")
+    public ResponseEntity<ApiResponse<SessionResponse>> finish(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable String sessionId) {
+        SessionResponse response = sessionService.finishSession(userDetails.getUserId(), sessionId);
+        return ResponseEntity.ok(ApiResponse.ok(response.getMessage(), response));
+    }
+
+    @Operation(summary = "러닝 세션 취소")
+    @PostMapping("/{sessionId}/cancel")
+    public ResponseEntity<ApiResponse<Void>> cancel(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable String sessionId) {
+        sessionService.cancelSession(userDetails.getUserId(), sessionId);
+        return ResponseEntity.ok(ApiResponse.ok("세션이 취소되었습니다.", null));
+    }
+
+    @Operation(summary = "러닝 세션 상태 조회 (앱 재진입/네트워크 복구 시)")
+    @GetMapping("/{sessionId}")
+    public ResponseEntity<ApiResponse<SessionDetailResponse>> getSession(
+            @AuthenticationPrincipal CustomUserDetails userDetails,
+            @PathVariable String sessionId) {
+        return ResponseEntity.ok(ApiResponse.ok(sessionService.getSession(userDetails.getUserId(), sessionId)));
     }
 
     // WebSocket STOMP 엔드포인트
     @MessageMapping("/session/{sessionId}/track")
     @SendTo("/topic/session/{sessionId}")
-    public TrackResponse trackWebSocket(
-            @DestinationVariable String sessionId,
-            TrackRequest request) {
+    public TrackResponse trackWebSocket(@DestinationVariable String sessionId, TrackRequest request) {
         return trackingService.checkPosition(sessionId, request.getLat(), request.getLng());
     }
 }

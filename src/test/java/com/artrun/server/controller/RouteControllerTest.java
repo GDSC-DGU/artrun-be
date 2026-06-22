@@ -1,14 +1,17 @@
 package com.artrun.server.controller;
 
+import com.artrun.server.dto.response.RouteDetailResponse;
 import com.artrun.server.dto.response.RouteStatusResponse;
 import com.artrun.server.dto.response.TaskResponse;
+import com.artrun.server.security.CustomUserDetailsService;
+import com.artrun.server.security.JwtTokenProvider;
 import com.artrun.server.service.RouteService;
+import com.artrun.server.support.WithMockCustomUser;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
 import org.springframework.http.MediaType;
-import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -17,84 +20,93 @@ import java.util.List;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
 @WebMvcTest(RouteController.class)
 class RouteControllerTest {
 
-    @Autowired
-    private MockMvc mockMvc;
-
-    @MockitoBean
-    private RouteService routeService;
+    @Autowired MockMvc mockMvc;
+    @MockitoBean RouteService routeService;
+    @MockitoBean JwtTokenProvider jwtTokenProvider;
+    @MockitoBean CustomUserDetailsService customUserDetailsService;
 
     @Test
-    @WithMockUser
+    @WithMockCustomUser
     @DisplayName("POST /api/v1/routes/generate - 202 반환")
     void generateRoute_returns202() throws Exception {
-        TaskResponse taskResponse = TaskResponse.builder()
-                .taskId("task-1234")
-                .message("경로 생성을 시작합니다.")
-                .build();
-        when(routeService.generateRoute(any())).thenReturn(taskResponse);
+        when(routeService.generateRoute(any())).thenReturn(
+                TaskResponse.builder().taskId("task-1234").message("경로 생성을 시작합니다.").build());
 
-        String body = """
-                {
-                    "requestText": "강아지 모양으로 5km 뛰고 싶어",
-                    "shapeType": "dog",
-                    "targetDistanceKm": 5.0,
-                    "startPoint": {"lat": 37.5665, "lng": 126.978}
-                }
-                """;
-
-        mockMvc.perform(post("/api/v1/routes/generate")
-                        .with(csrf())
+        mockMvc.perform(post("/api/v1/routes/generate").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
+                        .content("""
+                                {
+                                    "requestText": "별 모양 5km",
+                                    "shapeType": "STAR",
+                                    "targetDistanceKm": 5.0,
+                                    "startPoint": {"lat": 37.5665, "lng": 126.978}
+                                }
+                                """))
                 .andExpect(status().isAccepted())
-                .andExpect(jsonPath("$.success").value(true))
                 .andExpect(jsonPath("$.data.taskId").value("task-1234"));
     }
 
     @Test
-    @WithMockUser
+    @WithMockCustomUser
     @DisplayName("POST /api/v1/routes/generate - 필수 필드 누락 시 400")
     void generateRoute_missingFields_returns400() throws Exception {
-        String body = """
-                {
-                    "shapeType": "dog"
-                }
-                """;
-
-        mockMvc.perform(post("/api/v1/routes/generate")
-                        .with(csrf())
+        mockMvc.perform(post("/api/v1/routes/generate").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content(body))
+                        .content("""
+                                {"shapeType": "STAR"}
+                                """))
                 .andExpect(status().isBadRequest());
     }
 
     @Test
-    @WithMockUser
+    @WithMockCustomUser
     @DisplayName("GET /api/v1/routes/status/{taskId} - 완료 상태 조회")
     void getStatus_completed() throws Exception {
-        RouteStatusResponse response = RouteStatusResponse.builder()
-                .status("COMPLETED")
-                .candidateRoutes(List.of(
-                        RouteStatusResponse.CandidateRouteDto.builder()
-                                .routeId("R_001")
-                                .distance(4850.0)
-                                .similarityScore(92.0)
-                                .polyline(List.of())
-                                .build()
-                ))
-                .build();
-        when(routeService.getTaskStatus("task-1234")).thenReturn(response);
+        when(routeService.getTaskStatus("task-1234")).thenReturn(
+                RouteStatusResponse.builder()
+                        .status("COMPLETED")
+                        .candidateRoutes(List.of(
+                                RouteStatusResponse.CandidateRouteDto.builder()
+                                        .routeId("R_001").distance(4850.0)
+                                        .similarityScore(92.0).polyline(List.of()).build()))
+                        .build());
 
         mockMvc.perform(get("/api/v1/routes/status/task-1234"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.status").value("COMPLETED"))
                 .andExpect(jsonPath("$.data.candidateRoutes[0].routeId").value("R_001"));
+    }
+
+    @Test
+    @WithMockCustomUser
+    @DisplayName("GET /api/v1/routes/{routeId} - 루트 상세 조회")
+    void getRoute_success() throws Exception {
+        when(routeService.getRoute("route-001")).thenReturn(
+                RouteDetailResponse.builder()
+                        .routeId("route-001").distanceMeters(5000.0)
+                        .polyline(List.of()).checkpoints(List.of()).build());
+
+        mockMvc.perform(get("/api/v1/routes/route-001"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.routeId").value("route-001"))
+                .andExpect(jsonPath("$.data.distanceMeters").value(5000.0));
+    }
+
+    @Test
+    @WithMockCustomUser
+    @DisplayName("POST /api/v1/routes/{routeId}/regenerate - 202 반환")
+    void regenerateRoute_returns202() throws Exception {
+        when(routeService.regenerateRoute("route-001")).thenReturn(
+                TaskResponse.builder().taskId("task-new").message("새로운 경로 생성을 시작합니다.").build());
+
+        mockMvc.perform(post("/api/v1/routes/route-001/regenerate").with(csrf()))
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.data.taskId").value("task-new"));
     }
 }

@@ -2,14 +2,12 @@ package com.artrun.server.controller;
 
 import com.artrun.server.common.ApiResponse;
 import com.artrun.server.dto.request.RouteGenerateRequest;
+import com.artrun.server.dto.response.RouteDetailResponse;
 import com.artrun.server.dto.response.RouteStatusResponse;
 import com.artrun.server.dto.response.TaskResponse;
 import com.artrun.server.service.RouteService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
-import io.swagger.v3.oas.annotations.media.Content;
-import io.swagger.v3.oas.annotations.media.ExampleObject;
-import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -25,49 +23,33 @@ public class RouteController {
 
     private final RouteService routeService;
 
-    @Operation(summary = "경로 생성 요청", description = "사용자의 위치, 도형, 목표 거리를 받아 AI 기반 러닝 경로를 비동기로 생성합니다.")
-    @ApiResponses({
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "202", description = "경로 생성 작업이 시작됨"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "400", description = "잘못된 요청")
-    })
-    @io.swagger.v3.oas.annotations.parameters.RequestBody(
-        content = @Content(mediaType = "application/json", examples = @ExampleObject(
-            name = "별 모양 5km 경로",
-            value = """
-                {
-                  "requestText": "동대문 근처에서 별 모양으로 달리고 싶어요",
-                  "shapeType": "STAR",
-                  "activityType": "RUNNING",
-                  "targetDistanceKm": 5.0,
-                  "startPoint": {
-                    "lat": 37.5665,
-                    "lng": 126.9780
-                  },
-                  "preferences": {
-                    "avoidMainRoad": true,
-                    "preferPark": false
-                  }
-                }
-                """
-        ))
-    )
+    @Operation(summary = "러닝 루트 생성 요청 (비동기, taskId 반환)")
     @PostMapping("/generate")
     public ResponseEntity<ApiResponse<TaskResponse>> generateRoute(
             @Valid @RequestBody RouteGenerateRequest request) {
-        TaskResponse response = routeService.generateRoute(request);
         return ResponseEntity.status(HttpStatus.ACCEPTED)
-                .body(ApiResponse.ok("경로 생성을 시작합니다.", response));
+                .body(ApiResponse.ok("경로 생성을 시작합니다.", routeService.generateRoute(request)));
     }
 
-    @Operation(summary = "경로 생성 상태 조회", description = "taskId로 경로 생성 작업의 진행 상태를 조회합니다. 완료 시 후보 경로 목록을 반환합니다.")
-    @ApiResponses({
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "200", description = "상태 조회 성공"),
-            @io.swagger.v3.oas.annotations.responses.ApiResponse(responseCode = "404", description = "작업을 찾을 수 없음")
-    })
+    @Operation(summary = "루트 생성 상태 조회 (폴링)")
     @GetMapping("/status/{taskId}")
     public ResponseEntity<ApiResponse<RouteStatusResponse>> getStatus(
             @Parameter(description = "경로 생성 작업 ID") @PathVariable String taskId) {
-        RouteStatusResponse response = routeService.getTaskStatus(taskId);
-        return ResponseEntity.ok(ApiResponse.ok(response));
+        return ResponseEntity.ok(ApiResponse.ok(routeService.getTaskStatus(taskId)));
+    }
+
+    @Operation(summary = "루트 상세 조회 (체크포인트 포함)")
+    @GetMapping("/{routeId}")
+    public ResponseEntity<ApiResponse<RouteDetailResponse>> getRoute(
+            @Parameter(description = "루트 ID") @PathVariable String routeId) {
+        return ResponseEntity.ok(ApiResponse.ok(routeService.getRoute(routeId)));
+    }
+
+    @Operation(summary = "루트 재생성 요청 (기존 조건 기반)")
+    @PostMapping("/{routeId}/regenerate")
+    public ResponseEntity<ApiResponse<TaskResponse>> regenerateRoute(
+            @Parameter(description = "기존 루트 ID") @PathVariable String routeId) {
+        return ResponseEntity.status(HttpStatus.ACCEPTED)
+                .body(ApiResponse.ok("새로운 경로 생성을 시작합니다.", routeService.regenerateRoute(routeId)));
     }
 }
