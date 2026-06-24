@@ -1,0 +1,117 @@
+{
+  "version": "v3.2.1",
+  "profile_name": "less_repetition",
+  "speed_zones": {
+    "deep_control_max": -0.25,
+    "control_max": -0.12,
+    "light_control_max": -0.05,
+    "steady_min": -0.05,
+    "steady_max": 0.05,
+    "light_push_max": 0.12,
+    "push_max": 0.25,
+    "strong_push_max": 0.35,
+    "preferred_degree_ranges": {
+      "deep_control": [
+        0.15,
+        0.4
+      ],
+      "control": [
+        0.15,
+        0.4
+      ],
+      "light_control": [
+        0.35,
+        0.5
+      ],
+      "steady_deadband": [
+        0.45,
+        0.6
+      ],
+      "light_push": [
+        0.58,
+        0.72
+      ],
+      "push": [
+        0.65,
+        0.8
+      ],
+      "strong_push": [
+        0.75,
+        0.9
+      ],
+      "rhythm_rebuild": [
+        0.75,
+        0.9
+      ]
+    },
+    "control_window_sec": 30,
+    "short_trend_window_sec": 10,
+    "zone_confirmation_sec": 20,
+    "min_music_hold_bars": 16,
+    "min_music_hold_sec": 30,
+    "target_degree_delta_threshold": 0.08,
+    "music_pace_control_denominator": 0.35,
+    "trend_weight": 0.5,
+    "target_degree_center": 0.5,
+    "target_degree_span": 0.35,
+    "target_degree_min": 0.15,
+    "target_degree_max": 0.85
+  },
+  "fake_groove": {
+    "tempo_feel_drop_block": 0.35,
+    "pulse_density_drop_block": 0.35,
+    "drive_cliff_block": 0.35,
+    "half_time_shift_block": 0.4,
+    "internal_degree_range_block": 0.28,
+    "effective_pulse_stability_min": 0.55,
+    "min_internal_degree_margin": 0.25
+  },
+  "connector": {
+    "intro_like_block": 0.45,
+    "pulse_drop_block": 0.35,
+    "pulse_continuity_min": 0.6,
+    "drive_preservation_min": 0.55,
+    "cadence_lock_continuity_min": 0.55,
+    "tempo_feel_drop_block": 0.35,
+    "drive_cliff_block": 0.35
+  },
+  "diversity": {
+    "recent_segment_hard_exclude_count": 12,
+    "recent_track_cooldown_count": 5,
+    "recent_track_penalty": -0.35,
+    "same_degree_bin_repeat_penalty": -0.06,
+    "same_section_label_repeat_penalty": -0.04,
+    "same_transition_type_repeat_penalty": -0.04,
+    "session_track_play_count_penalty_each": -0.08,
+    "session_track_play_count_penalty_max": -0.3,
+    "eligible_diversity_score_gap": 0.5,
+    "softmax_temperature": 0.08,
+    "use_weighted_rotation": false
+  },
+  "coverage": {
+    "degree_bin_size": 0.1,
+    "stable_min_per_bin": 5,
+    "stable_recommended_per_bin": 10,
+    "connector_min_per_bin": 2,
+    "connector_recommended_per_bin": 4,
+    "unique_track_min_per_bin": 2,
+    "unique_track_recommended_per_bin": 3
+  },
+  "weights": {
+    "music_speed_degree_match": 0.18,
+    "speed_zone_contrast_score": 0.16,
+    "current_to_candidate_smoothness": 0.13,
+    "degree_step_smoothness": 0.1,
+    "pulse_continuity_score": 0.11,
+    "drive_preservation_score": 0.1,
+    "cadence_lock_support": 0.08,
+    "flow_momentum_score": 0.07,
+    "block_stability_score": 0.07,
+    "tempo_feel_drop_penalty": 0.14,
+    "pulse_density_drop_penalty": 0.12,
+    "drive_cliff_penalty": 0.12,
+    "half_time_shift_penalty": 0.1,
+    "intro_like_penalty": 0.08,
+    "overpush_penalty": 0.06
+  }
+}

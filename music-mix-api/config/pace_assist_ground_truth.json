@@ -1,0 +1,27 @@
+{
+  "cases": [
+    {
+      "segment_id": "track1_seg_003",
+      "track_id": "track1",
+      "expected_role": "recovery_or_low_drive",
+      "should_not_rank_for": ["pace_up", "sprint_push"],
+      "human_pace_push_rating": 1,
+      "human_cadence_lock_rating": 2,
+      "human_bass_drive_rating": 2,
+      "human_calmness_rating": 5,
+      "notes": "Energy 5/drop으로 나오지만 실제로는 차분함. pace-up 부적합."
+    },
+    {
+      "segment_id": "track6_seg_004",
+      "track_id": "track6",
+      "expected_role": "steady_or_pace_up_candidate",
+      "should_rank_for": ["steady", "pace_up"],
+      "max_rank": 10,
+      "human_pace_push_rating": 4,
+      "human_cadence_lock_rating": 4,
+      "human_bass_drive_rating": 3,
+      "human_calmness_rating": 2,
+      "notes": "groove가 살아 있고 발 맞추기 좋음. track1_seg_003보다 pace-up에 적합."
+    }
+  ]
+}

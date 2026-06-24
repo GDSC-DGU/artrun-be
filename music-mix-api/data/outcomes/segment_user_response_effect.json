@@ -1,0 +1,38 @@
+{
+  "edm_028_seg_001": {
+    "segment_id": "edm_028_seg_001",
+    "track_id": "edm_028",
+    "plays": 3,
+    "avg_pace_error_reduction_30s": 0.7999999999999998,
+    "avg_pace_error_reduction_60s": 1.2666666666666666,
+    "skip_rate": 0.0,
+    "dislike_rate": 0.0,
+    "manual_bad_count": 0,
+    "success_rate_by_speed_zone": {
+      "strong_push": {
+        "plays": 2,
+        "successes": 2,
+        "success_rate": 1.0
+      }
+    },
+    "user_response_effect": 0.7408
+  },
+  "seg_x": {
+    "segment_id": "seg_x",
+    "track_id": "track_x",
+    "plays": 7,
+    "avg_pace_error_reduction_30s": 0.8000000000000007,
+    "avg_pace_error_reduction_60s": 1.0999999999999996,
+    "skip_rate": 0.0,
+    "dislike_rate": 0.0,
+    "manual_bad_count": 0,
+    "success_rate_by_speed_zone": {
+      "push": {
+        "plays": 7,
+        "successes": 7,
+        "success_rate": 1.0
+      }
+    },
+    "user_response_effect": 0.7263
+  }
+}
