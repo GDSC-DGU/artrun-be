@@ -27,9 +27,7 @@ services:
       - redisdata:/data
 
   app:
-    build:
-      context: .
-      dockerfile: Dockerfile
+    image: ghcr.io/gdsc-dgu/artrun-be:latest
     container_name: artrun-app
     ports:
       - "8080:8080"
