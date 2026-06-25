@@ -48,23 +48,19 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd ~/artrun-be
-
-            # ghcr.io 로그인 후 최신 이미지 pull
             REPO_LOWER=$(echo "${{ github.repository }}" | tr '[:upper:]' '[:lower:]')
             echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
             docker pull ghcr.io/${REPO_LOWER}:${{ github.sha }}
-
-            # .env 파일 갱신
             cat > .env <<EOF
             IMAGE_TAG=${{ github.sha }}
             GITHUB_REPOSITORY=${REPO_LOWER}
             GEMINI_API_KEY=${{ secrets.GEMINI_API_KEY }}
             MAPBOX_API_KEY=${{ secrets.MAPBOX_API_KEY }}
             DB_PASSWORD=${{ secrets.DB_PASSWORD }}
+            AWS_ACCESS_KEY=${{ secrets.AWS_ACCESS_KEY }}
+            AWS_SECRET_KEY=${{ secrets.AWS_SECRET_KEY }}
+            S3_BUCKET=${{ secrets.S3_BUCKET }}
+            S3_BASE_URL=${{ secrets.S3_BASE_URL }}
             EOF
-
-            # 앱만 무중단 재시작 (DB/Redis는 유지)
-            docker compose -f docker-compose.yml -f docker-compose.ec2.yml up -d --no-build app
-
-            # 오래된 이미지 정리
+            docker-compose -f docker-compose.yml -f docker-compose.ec2.yml up -d --force-recreate app
             docker image prune -f
