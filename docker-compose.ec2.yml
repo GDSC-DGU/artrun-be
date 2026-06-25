@@ -4,3 +4,9 @@ services:
     environment:
       SPRING_PROFILES_ACTIVE: prod
       DB_PASSWORD: ${DB_PASSWORD:-artrun}
+      DB_HOST: artrun-db
+      DB_PORT: "5432"
+      DB_NAME: artrun
+      DB_USERNAME: artrun
+      REDIS_HOST: artrun-redis
+      REDIS_PORT: "6379"
