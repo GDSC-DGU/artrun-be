@@ -2,9 +2,13 @@ package com.artrun.server.service;
 
 import com.artrun.server.common.BusinessException;
 import com.artrun.server.domain.*;
+import com.artrun.server.dto.request.CancelSessionRequest;
+import com.artrun.server.dto.request.FinishSessionRequest;
+import com.artrun.server.dto.request.ResumeSessionRequest;
 import com.artrun.server.dto.request.StartSessionRequest;
+import com.artrun.server.dto.response.FinishSessionResponse;
 import com.artrun.server.dto.response.SessionDetailResponse;
-import com.artrun.server.dto.response.SessionResponse;
+import com.artrun.server.dto.response.StartSessionResponse;
 import com.artrun.server.repository.RouteRepository;
 import com.artrun.server.repository.RunSessionRepository;
 import com.artrun.server.repository.UserRepository;
@@ -14,6 +18,7 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.Optional;
 
@@ -27,6 +32,7 @@ class SessionServiceTest {
     @Mock RunSessionRepository runSessionRepository;
     @Mock RouteRepository routeRepository;
     @Mock UserRepository userRepository;
+    @Mock JdbcTemplate jdbcTemplate;
 
     @InjectMocks SessionService sessionService;
 
@@ -52,10 +58,14 @@ class SessionServiceTest {
         when(userRepository.findById("user-1")).thenReturn(Optional.of(user));
         when(runSessionRepository.save(any())).thenReturn(session);
 
-        SessionResponse response = sessionService.startSession("user-1", new StartSessionRequest("route-1"));
+        StartSessionRequest.CurrentPointDto cp = StartSessionRequest.CurrentPointDto.builder()
+                .lat(0.0).lng(0.0).build();
+        StartSessionRequest request = StartSessionRequest.builder()
+                .routeId("route-1").currentPoint(cp).build();
+        StartSessionResponse response = sessionService.startSession("user-1", request);
 
         assertThat(response.getSessionId()).isEqualTo("session-1");
-        assertThat(response.getStatus()).isEqualTo("ACTIVE");
+        assertThat(response.isStartAllowed()).isTrue();
     }
 
     @Test
@@ -63,7 +73,8 @@ class SessionServiceTest {
     void startSession_routeNotFound() {
         when(routeRepository.findById("invalid")).thenReturn(Optional.empty());
 
-        assertThatThrownBy(() -> sessionService.startSession("user-1", new StartSessionRequest("invalid")))
+        StartSessionRequest request = StartSessionRequest.builder().routeId("invalid").build();
+        assertThatThrownBy(() -> sessionService.startSession("user-1", request))
                 .isInstanceOf(BusinessException.class);
     }
 
@@ -74,7 +85,8 @@ class SessionServiceTest {
         when(routeRepository.findById("route-1")).thenReturn(Optional.of(route));
         when(runSessionRepository.existsByUser_IdAndRoute_IdAndStatus("user-1", "route-1", SessionStatus.ACTIVE)).thenReturn(true);
 
-        assertThatThrownBy(() -> sessionService.startSession("user-1", new StartSessionRequest("route-1")))
+        StartSessionRequest request = StartSessionRequest.builder().routeId("route-1").build();
+        assertThatThrownBy(() -> sessionService.startSession("user-1", request))
                 .isInstanceOf(BusinessException.class);
     }
 
@@ -106,7 +118,10 @@ class SessionServiceTest {
         when(runSessionRepository.findByIdAndUser_Id("session-1", "user-1")).thenReturn(Optional.of(session));
         when(runSessionRepository.save(any())).thenReturn(session);
 
-        sessionService.resumeSession("user-1", "session-1");
+        ResumeSessionRequest resumeReq = ResumeSessionRequest.builder()
+                .currentPoint(StartSessionRequest.CurrentPointDto.builder().lat(0.0).lng(0.0).build())
+                .build();
+        sessionService.resumeSession("user-1", "session-1", resumeReq);
 
         assertThat(session.getStatus()).isEqualTo(SessionStatus.ACTIVE);
     }
@@ -122,10 +137,10 @@ class SessionServiceTest {
         when(runSessionRepository.findByIdAndUser_Id("session-1", "user-1")).thenReturn(Optional.of(session));
         when(runSessionRepository.save(any())).thenReturn(session);
 
-        SessionResponse response = sessionService.finishSession("user-1", "session-1");
+        FinishSessionResponse response = sessionService.finishSession("user-1", "session-1", new FinishSessionRequest());
 
         assertThat(session.getStatus()).isEqualTo(SessionStatus.FINISHED);
-        assertThat(response.getStatus()).isEqualTo("FINISHED");
+        assertThat(response.getStatus()).isEqualTo("COMPLETED");
     }
 
     @Test
@@ -138,7 +153,7 @@ class SessionServiceTest {
 
         when(runSessionRepository.findByIdAndUser_Id("session-1", "user-1")).thenReturn(Optional.of(session));
 
-        assertThatThrownBy(() -> sessionService.finishSession("user-1", "session-1"))
+        assertThatThrownBy(() -> sessionService.finishSession("user-1", "session-1", new FinishSessionRequest()))
                 .isInstanceOf(BusinessException.class);
     }
 
@@ -153,7 +168,7 @@ class SessionServiceTest {
         when(runSessionRepository.findByIdAndUser_Id("session-1", "user-1")).thenReturn(Optional.of(session));
         when(runSessionRepository.save(any())).thenReturn(session);
 
-        sessionService.cancelSession("user-1", "session-1");
+        sessionService.cancelSession("user-1", "session-1", new CancelSessionRequest());
 
         assertThat(session.getStatus()).isEqualTo(SessionStatus.CANCELLED);
     }
@@ -171,7 +186,7 @@ class SessionServiceTest {
         SessionDetailResponse response = sessionService.getSession("user-1", "session-1");
 
         assertThat(response.getSessionId()).isEqualTo("session-1");
-        assertThat(response.getStatus()).isEqualTo("ACTIVE");
+        assertThat(response.getStatus()).isEqualTo("RUNNING");
     }
 
     @Test

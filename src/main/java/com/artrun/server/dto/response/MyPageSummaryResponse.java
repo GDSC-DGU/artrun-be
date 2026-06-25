@@ -6,9 +6,11 @@ import lombok.Getter;
 @Getter
 @Builder
 public class MyPageSummaryResponse {
-    private UserResponse user;
-    private long totalRuns;
+    private String userId;
+    private String nickname;
+    private String profileImageUrl;
     private double totalDistanceKm;
-    private long totalTimeSeconds;
-    private double averagePaceMinPerKm;
+    private long totalRunCount;
+    private long sharedRouteCount;
+    private long likedRouteCount;
 }

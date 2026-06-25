@@ -29,15 +29,15 @@ public class UserController {
     @GetMapping("/me")
     public ResponseEntity<ApiResponse<UserResponse>> getMe(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        return ResponseEntity.ok(ApiResponse.ok(userService.getMe(userDetails.getUserId())));
+        return ResponseEntity.ok(ApiResponse.ok("내 정보 조회 성공", userService.getMe(userDetails.getUserId())));
     }
 
     @Operation(summary = "내 정보 수정")
     @PatchMapping("/me")
-    public ResponseEntity<ApiResponse<UserResponse>> updateMe(
+    public ResponseEntity<ApiResponse<UpdateUserResponse>> updateMe(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @Valid @RequestBody UpdateUserRequest request) {
-        return ResponseEntity.ok(ApiResponse.ok("정보가 수정되었습니다.",
+        return ResponseEntity.ok(ApiResponse.ok("내 정보가 수정되었습니다.",
                 userService.updateMe(userDetails.getUserId(), request)));
     }
 
@@ -45,23 +45,25 @@ public class UserController {
     @GetMapping("/me/summary")
     public ResponseEntity<ApiResponse<MyPageSummaryResponse>> getSummary(
             @AuthenticationPrincipal CustomUserDetails userDetails) {
-        return ResponseEntity.ok(ApiResponse.ok(userService.getSummary(userDetails.getUserId())));
+        return ResponseEntity.ok(ApiResponse.ok("마이페이지 요약 조회 성공", userService.getSummary(userDetails.getUserId())));
     }
 
     @Operation(summary = "내 완주 기록 목록 조회")
     @GetMapping("/me/records")
-    public ResponseEntity<ApiResponse<Page<RecordDetailResponse>>> getMyRecords(
+    public ResponseEntity<ApiResponse<RecordListResponse>> getMyRecords(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PageableDefault(size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
-        return ResponseEntity.ok(ApiResponse.ok(userService.getMyRecords(userDetails.getUserId(), pageable)));
+        return ResponseEntity.ok(ApiResponse.ok("완주 기록 목록 조회 성공",
+                userService.getMyRecords(userDetails.getUserId(), pageable)));
     }
 
     @Operation(summary = "내 완주 기록 상세 조회")
     @GetMapping("/me/records/{recordId}")
-    public ResponseEntity<ApiResponse<RecordDetailResponse>> getMyRecord(
+    public ResponseEntity<ApiResponse<MyRecordDetailResponse>> getMyRecord(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable String recordId) {
-        return ResponseEntity.ok(ApiResponse.ok(userService.getMyRecord(userDetails.getUserId(), recordId)));
+        return ResponseEntity.ok(ApiResponse.ok("완주 기록 상세 조회 성공",
+                userService.getMyRecord(userDetails.getUserId(), recordId)));
     }
 
     @Operation(summary = "내 완주 기록 삭제")
@@ -70,22 +72,24 @@ public class UserController {
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PathVariable String recordId) {
         userService.deleteMyRecord(userDetails.getUserId(), recordId);
-        return ResponseEntity.ok(ApiResponse.ok("기록이 삭제되었습니다.", null));
+        return ResponseEntity.ok(ApiResponse.ok("완주 기록이 삭제되었습니다.", null));
     }
 
     @Operation(summary = "좋아요한 러닝 루트 목록 조회")
     @GetMapping("/me/liked-routes")
-    public ResponseEntity<ApiResponse<Page<CommunityRouteResponse>>> getLikedRoutes(
+    public ResponseEntity<ApiResponse<LikedRouteListResponse>> getLikedRoutes(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PageableDefault(size = 10) Pageable pageable) {
-        return ResponseEntity.ok(ApiResponse.ok(userService.getLikedRoutes(userDetails.getUserId(), pageable)));
+        return ResponseEntity.ok(ApiResponse.ok("좋아요한 러닝 루트 조회 성공",
+                userService.getLikedRoutes(userDetails.getUserId(), pageable)));
     }
 
     @Operation(summary = "내가 커뮤니티에 등록한 루트 목록 조회")
     @GetMapping("/me/shared-routes")
-    public ResponseEntity<ApiResponse<Page<CommunityRouteResponse>>> getMySharedRoutes(
+    public ResponseEntity<ApiResponse<SharedRouteListResponse>> getMySharedRoutes(
             @AuthenticationPrincipal CustomUserDetails userDetails,
             @PageableDefault(size = 10) Pageable pageable) {
-        return ResponseEntity.ok(ApiResponse.ok(userService.getMySharedRoutes(userDetails.getUserId(), pageable)));
+        return ResponseEntity.ok(ApiResponse.ok("내가 등록한 루트 조회 성공",
+                userService.getMySharedRoutes(userDetails.getUserId(), pageable)));
     }
 }

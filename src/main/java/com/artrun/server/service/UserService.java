@@ -3,25 +3,35 @@ package com.artrun.server.service;
 import com.artrun.server.common.BusinessException;
 import com.artrun.server.common.ErrorCode;
 import com.artrun.server.domain.User;
+import com.artrun.server.dto.request.SaveRecordRequest;
 import com.artrun.server.dto.request.UpdateUserRequest;
 import com.artrun.server.dto.response.*;
 import com.artrun.server.repository.CommunityRouteRepository;
 import com.artrun.server.repository.RouteLikeRepository;
 import com.artrun.server.repository.RunRecordRepository;
 import com.artrun.server.repository.UserRepository;
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
 
-import java.util.Arrays;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class UserService {
+
+    private static final ObjectMapper OBJECT_MAPPER = new ObjectMapper()
+            .registerModule(new JavaTimeModule())
+            .disable(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS);
 
     private final UserRepository userRepository;
     private final RunRecordRepository runRecordRepository;
@@ -35,7 +45,7 @@ public class UserService {
     }
 
     @Transactional
-    public UserResponse updateMe(String userId, UpdateUserRequest request) {
+    public UpdateUserResponse updateMe(String userId, UpdateUserRequest request) {
         User user = findUser(userId);
 
         if (StringUtils.hasText(request.getNickname())) {
@@ -48,112 +58,196 @@ public class UserService {
             user.setProfileImageUrl(request.getProfileImageUrl());
         }
 
-        return UserResponse.from(userRepository.save(user));
+        User saved = userRepository.save(user);
+        return UpdateUserResponse.builder()
+                .userId(saved.getId())
+                .nickname(saved.getNickname())
+                .profileImageUrl(saved.getProfileImageUrl())
+                .updatedAt(saved.getUpdatedAt())
+                .build();
     }
 
     @Transactional(readOnly = true)
     public MyPageSummaryResponse getSummary(String userId) {
         User user = findUser(userId);
-        long totalRuns = runRecordRepository.countByUser_Id(userId);
+        long totalRunCount = runRecordRepository.countByUser_Id(userId);
         double totalDistanceM = runRecordRepository.sumDistanceByUserId(userId);
-        long totalTimeSeconds = runRecordRepository.sumTimeByUserId(userId);
+        long sharedRouteCount = communityRouteRepository.countByUser_Id(userId);
+        long likedRouteCount = routeLikeRepository.countByUser_Id(userId);
 
-        double totalDistanceKm = totalDistanceM / 1000.0;
-        double avgPace = (totalDistanceKm > 0)
-                ? (totalTimeSeconds / 60.0) / totalDistanceKm
-                : 0.0;
+        double totalDistanceKm = Math.round(totalDistanceM / 10.0) / 100.0;
 
         return MyPageSummaryResponse.builder()
-                .user(UserResponse.from(user))
-                .totalRuns(totalRuns)
+                .userId(user.getId())
+                .nickname(user.getNickname())
+                .profileImageUrl(user.getProfileImageUrl())
                 .totalDistanceKm(totalDistanceKm)
-                .totalTimeSeconds(totalTimeSeconds)
-                .averagePaceMinPerKm(avgPace)
+                .totalRunCount(totalRunCount)
+                .sharedRouteCount(sharedRouteCount)
+                .likedRouteCount(likedRouteCount)
                 .build();
     }
 
     @Transactional(readOnly = true)
-    public Page<RecordDetailResponse> getMyRecords(String userId, Pageable pageable) {
-        return runRecordRepository.findByUser_IdOrderByCreatedAtDesc(userId, pageable)
-                .map(record -> {
-                    List<RecordDetailResponse.LatLng> actual = record.getCorrectedPolyline() != null
-                            ? Arrays.stream(record.getCorrectedPolyline().getCoordinates())
-                                .map(c -> RecordDetailResponse.LatLng.builder().lat(c.y).lng(c.x).build())
-                                .toList()
-                            : List.of();
+    public RecordListResponse getMyRecords(String userId, Pageable pageable) {
+        var page = runRecordRepository.findByUser_IdOrderByCreatedAtDesc(userId, pageable);
+        java.util.Set<String> sharedIds = communityRouteRepository.findSharedRecordIdsByUserId(userId);
 
-                    return RecordDetailResponse.builder()
+        List<RecordSummaryResponse> records = page.getContent().stream()
+                .map(record -> {
+                    var route = record.getSession().getRoute();
+                    var task = route != null ? route.getTask() : null;
+                    double distanceKm = record.getTotalDistanceMeters() != null
+                            ? Math.round(record.getTotalDistanceMeters() / 10.0) / 100.0 : 0;
+                    int pace = record.getAveragePaceSecPerKm() != null ? record.getAveragePaceSecPerKm() : 0;
+
+                    return RecordSummaryResponse.builder()
                             .recordId(record.getId())
-                            .routeId(record.getSession().getRoute().getId())
-                            .actualPolyline(actual)
-                            .totalDistanceMeters(record.getTotalDistanceMeters())
-                            .totalTimeSeconds(record.getTotalTimeSeconds())
-                            .averageSpeed(record.getAverageSpeed())
+                            .routeId(route != null ? route.getId() : null)
+                            .routeName(route != null ? route.getRouteName() : null)
+                            .shapeType(task != null ? task.getShapeType() : null)
+                            .distanceKm(distanceKm)
+                            .averagePace(formatPaceText(pace))
+                            .totalTimeSeconds(record.getTotalTimeSeconds() != null ? record.getTotalTimeSeconds() : 0)
+                            .matchRate(record.getMatchRate() != null ? record.getMatchRate() : 0)
                             .imageUrl(record.getImageUrl())
-                            .createdAt(record.getCreatedAt())
+                            .shared(sharedIds.contains(record.getId()))
+                            .completedAt(record.getCreatedAt())
                             .build();
-                });
+                })
+                .toList();
+
+        return RecordListResponse.builder()
+                .totalCount(page.getTotalElements())
+                .records(records)
+                .build();
     }
 
     @Transactional(readOnly = true)
-    public RecordDetailResponse getMyRecord(String userId, String recordId) {
+    public MyRecordDetailResponse getMyRecord(String userId, String recordId) {
         var record = runRecordRepository.findByIdAndUser_Id(recordId, userId)
                 .orElseThrow(() -> new BusinessException(ErrorCode.RECORD_NOT_FOUND));
 
-        List<RecordDetailResponse.LatLng> planned = record.getSession().getRoute().getPolyline() != null
-                ? Arrays.stream(record.getSession().getRoute().getPolyline().getCoordinates())
-                    .map(c -> RecordDetailResponse.LatLng.builder().lat(c.y).lng(c.x).build())
-                    .toList()
-                : List.of();
+        var route = record.getSession().getRoute();
+        var task = route != null ? route.getTask() : null;
+        double distanceKm = record.getTotalDistanceMeters() != null
+                ? Math.round(record.getTotalDistanceMeters() / 10.0) / 100.0 : 0;
+        int pace = record.getAveragePaceSecPerKm() != null ? record.getAveragePaceSecPerKm() : 0;
 
-        List<RecordDetailResponse.LatLng> actual = record.getCorrectedPolyline() != null
-                ? Arrays.stream(record.getCorrectedPolyline().getCoordinates())
-                    .map(c -> RecordDetailResponse.LatLng.builder().lat(c.y).lng(c.x).build())
-                    .toList()
-                : List.of();
+        List<MyRecordDetailResponse.LatLng> routePolyline = List.of();
+        if (route != null && route.getPolyline() != null) {
+            var coords = route.getPolyline().getCoordinates();
+            routePolyline = java.util.Arrays.stream(coords)
+                    .map(c -> MyRecordDetailResponse.LatLng.builder().lat(c.y).lng(c.x).build())
+                    .toList();
+        }
 
-        return RecordDetailResponse.builder()
+        List<MyRecordDetailResponse.GpsPoint> actualGpsPoints = parseActualGps(record.getRawGpsJson());
+        boolean shared = communityRouteRepository.existsByRecord_Id(recordId);
+
+        return MyRecordDetailResponse.builder()
                 .recordId(record.getId())
-                .routeId(record.getSession().getRoute().getId())
-                .plannedPolyline(planned)
-                .actualPolyline(actual)
-                .totalDistanceMeters(record.getTotalDistanceMeters())
-                .totalTimeSeconds(record.getTotalTimeSeconds())
-                .averageSpeed(record.getAverageSpeed())
+                .routeId(route != null ? route.getId() : null)
+                .routeName(route != null ? route.getRouteName() : null)
+                .shapeType(task != null ? task.getShapeType() : null)
+                .distanceKm(distanceKm)
+                .averagePace(formatPaceText(pace))
+                .averageBpm(record.getAverageBpm() != null ? record.getAverageBpm() : 0)
+                .totalTimeSeconds(record.getTotalTimeSeconds() != null ? record.getTotalTimeSeconds() : 0)
+                .matchRate(record.getMatchRate() != null ? record.getMatchRate() : 0)
                 .imageUrl(record.getImageUrl())
-                .createdAt(record.getCreatedAt())
+                .shared(shared)
+                .routePolyline(routePolyline)
+                .actualGpsPoints(actualGpsPoints)
+                .completedAt(record.getCreatedAt())
+                .build();
+    }
+
+    private List<MyRecordDetailResponse.GpsPoint> parseActualGps(String rawGpsJson) {
+        if (rawGpsJson == null) return List.of();
+        try {
+            List<SaveRecordRequest.GpsPoint> points = OBJECT_MAPPER.readValue(
+                    rawGpsJson, new TypeReference<>() {});
+            return points.stream()
+                    .map(p -> MyRecordDetailResponse.GpsPoint.builder()
+                            .lat(p.getLat()).lng(p.getLng()).timestamp(p.getTimestamp()).build())
+                    .toList();
+        } catch (Exception e) {
+            log.warn("Failed to parse rawGpsJson: {}", e.getMessage());
+            return List.of();
+        }
+    }
+
+    private List<RecordDetailResponse.CorrectedPolylinePoint> buildCorrectedPoints(
+            com.artrun.server.domain.RunRecord record) {
+        if (record.getCorrectedPolyline() == null) return List.of();
+        var coords = record.getCorrectedPolyline().getCoordinates();
+        return java.util.stream.IntStream.range(0, coords.length)
+                .mapToObj(i -> RecordDetailResponse.CorrectedPolylinePoint.builder()
+                        .lat(coords[i].y).lng(coords[i].x).order(i + 1).build())
+                .toList();
+    }
+
+    private String formatPaceText(int paceSecPerKm) {
+        if (paceSecPerKm <= 0) return "0'00\"";
+        return String.format("%d'%02d\"", paceSecPerKm / 60, paceSecPerKm % 60);
+    }
+
+    @Transactional(readOnly = true)
+    public LikedRouteListResponse getLikedRoutes(String userId, Pageable pageable) {
+        var page = routeLikeRepository.findByUser_IdOrderByCreatedAtDesc(userId, pageable);
+        List<LikedRouteResponse> routes = page.getContent().stream()
+                .map(like -> {
+                    var cr = like.getCommunityRoute();
+                    var record = cr.getRecord();
+                    var route = record != null ? record.getSession().getRoute() : null;
+                    var task = route != null ? route.getTask() : null;
+                    int pace = record != null && record.getAveragePaceSecPerKm() != null
+                            ? record.getAveragePaceSecPerKm() : 0;
+                    return LikedRouteResponse.builder()
+                            .routeId(route != null ? route.getId() : null)
+                            .title(cr.getTitle())
+                            .shapeType(task != null ? task.getShapeType() : null)
+                            .distanceKm(toDistanceKm(record))
+                            .averagePace(formatPaceText(pace))
+                            .locationName(cr.getLocationName())
+                            .creatorNickname(cr.getUser() != null ? cr.getUser().getNickname() : null)
+                            .thumbnailUrl(record != null ? record.getImageUrl() : null)
+                            .likeCount(cr.getLikeCount())
+                            .likedAt(like.getCreatedAt())
+                            .build();
+                })
+                .toList();
+        return LikedRouteListResponse.builder()
+                .totalCount(page.getTotalElements())
+                .routes(routes)
                 .build();
     }
 
     @Transactional(readOnly = true)
-    public Page<CommunityRouteResponse> getLikedRoutes(String userId, Pageable pageable) {
-        return routeLikeRepository.findByUser_IdOrderByCreatedAtDesc(userId, pageable)
-                .map(like -> {
-                    var cr = like.getCommunityRoute();
-                    return CommunityRouteResponse.builder()
+    public SharedRouteListResponse getMySharedRoutes(String userId, Pageable pageable) {
+        var page = communityRouteRepository.findByUser_IdOrderByCreatedAtDesc(userId, pageable);
+        List<SharedRouteResponse> routes = page.getContent().stream()
+                .map(cr -> {
+                    var record = cr.getRecord();
+                    var route = record != null ? record.getSession().getRoute() : null;
+                    return SharedRouteResponse.builder()
                             .communityRouteId(cr.getId())
+                            .recordId(record != null ? record.getId() : null)
+                            .routeId(route != null ? route.getId() : null)
                             .title(cr.getTitle())
                             .description(cr.getDescription())
-                            .author(UserResponse.from(cr.getUser()))
-                            .distanceMeters(cr.getRecord().getTotalDistanceMeters())
+                            .distanceKm(toDistanceKm(record))
+                            .imageUrl(record != null ? record.getImageUrl() : null)
                             .likeCount(cr.getLikeCount())
-                            .liked(true)
                             .createdAt(cr.getCreatedAt())
                             .build();
-                });
-    }
-
-    @Transactional(readOnly = true)
-    public Page<CommunityRouteResponse> getMySharedRoutes(String userId, Pageable pageable) {
-        return communityRouteRepository.findByUser_IdOrderByCreatedAtDesc(userId, pageable)
-                .map(cr -> CommunityRouteResponse.builder()
-                        .communityRouteId(cr.getId())
-                        .title(cr.getTitle())
-                        .description(cr.getDescription())
-                        .distanceMeters(cr.getRecord().getTotalDistanceMeters())
-                        .likeCount(cr.getLikeCount())
-                        .createdAt(cr.getCreatedAt())
-                        .build());
+                })
+                .toList();
+        return SharedRouteListResponse.builder()
+                .totalCount(page.getTotalElements())
+                .routes(routes)
+                .build();
     }
 
     @Transactional
@@ -166,6 +260,20 @@ public class UserService {
         }
 
         runRecordRepository.delete(record);
+    }
+
+    private CommunityRouteResponse.CreatorDto toCommunityCreatorDto(com.artrun.server.domain.User user) {
+        if (user == null) return null;
+        return CommunityRouteResponse.CreatorDto.builder()
+                .userId(user.getId())
+                .nickname(user.getNickname())
+                .profileImageUrl(user.getProfileImageUrl())
+                .build();
+    }
+
+    private double toDistanceKm(com.artrun.server.domain.RunRecord record) {
+        if (record == null || record.getTotalDistanceMeters() == null) return 0;
+        return Math.round(record.getTotalDistanceMeters() / 10.0) / 100.0;
     }
 
     private User findUser(String userId) {

@@ -1,6 +1,7 @@
 package com.artrun.server.controller;
 
 import com.artrun.server.common.ApiResponse;
+import com.artrun.server.dto.request.RegenerateRouteRequest;
 import com.artrun.server.dto.request.RouteGenerateRequest;
 import com.artrun.server.dto.response.RouteDetailResponse;
 import com.artrun.server.dto.response.RouteStatusResponse;
@@ -28,7 +29,7 @@ public class RouteController {
     public ResponseEntity<ApiResponse<TaskResponse>> generateRoute(
             @Valid @RequestBody RouteGenerateRequest request) {
         return ResponseEntity.status(HttpStatus.ACCEPTED)
-                .body(ApiResponse.ok("경로 생성을 시작합니다.", routeService.generateRoute(request)));
+                .body(ApiResponse.ok("경로 생성 작업이 시작되었습니다.", routeService.generateRoute(request)));
     }
 
     @Operation(summary = "루트 생성 상태 조회 (폴링)")
@@ -48,8 +49,9 @@ public class RouteController {
     @Operation(summary = "루트 재생성 요청 (기존 조건 기반)")
     @PostMapping("/{routeId}/regenerate")
     public ResponseEntity<ApiResponse<TaskResponse>> regenerateRoute(
-            @Parameter(description = "기존 루트 ID") @PathVariable String routeId) {
+            @Parameter(description = "기존 루트 ID") @PathVariable String routeId,
+            @RequestBody(required = false) RegenerateRouteRequest request) {
         return ResponseEntity.status(HttpStatus.ACCEPTED)
-                .body(ApiResponse.ok("새로운 경로 생성을 시작합니다.", routeService.regenerateRoute(routeId)));
+                .body(ApiResponse.ok("경로 재생성 작업이 시작되었습니다.", routeService.regenerateRoute(routeId, request)));
     }
 }

@@ -64,10 +64,12 @@ public class AuthService {
     @Transactional
     public AuthResponse socialLogin(SocialLoginRequest request) {
         AuthProvider provider = parseProvider(request.getProvider());
-        OAuthService.OAuthUserInfo info = oAuthService.getUserInfo(provider, request.getToken());
+        OAuthService.OAuthUserInfo info = oAuthService.getUserInfo(provider, request.getProviderAccessToken());
 
+        boolean[] isNew = {false};
         User user = userRepository.findByProviderAndSocialId(provider, info.socialId())
                 .orElseGet(() -> {
+                    isNew[0] = true;
                     String nickname = resolveNickname(info.nickname());
                     return userRepository.save(User.builder()
                             .email(info.email())
@@ -78,7 +80,7 @@ public class AuthService {
                             .build());
                 });
 
-        return issueTokens(user);
+        return issueTokens(user, isNew[0]);
     }
 
     public AuthResponse refresh(TokenRefreshRequest request) {
@@ -110,6 +112,10 @@ public class AuthService {
     }
 
     private AuthResponse issueTokens(User user) {
+        return issueTokens(user, null);
+    }
+
+    private AuthResponse issueTokens(User user, Boolean isNewUser) {
         String accessToken = jwtTokenProvider.generateAccessToken(user.getId());
         String refreshToken = jwtTokenProvider.generateRefreshToken(user.getId());
 
@@ -122,6 +128,7 @@ public class AuthService {
         return AuthResponse.builder()
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
+                .isNewUser(isNewUser)
                 .user(UserResponse.from(user))
                 .build();
     }

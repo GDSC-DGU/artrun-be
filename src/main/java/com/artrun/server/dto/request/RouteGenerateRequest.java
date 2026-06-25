@@ -27,6 +27,8 @@ public class RouteGenerateRequest {
     @Positive(message = "목표 거리는 양수여야 합니다.")
     private Double targetDistanceKm;
 
+    private Integer targetPaceSecPerKm;
+
     @NotNull @Valid
     private StartPointDto startPoint;
 
@@ -45,6 +47,8 @@ public class RouteGenerateRequest {
         @DecimalMin(value = "-180.0", message = "경도는 -180 이상이어야 합니다.")
         @DecimalMax(value = "180.0", message = "경도는 180 이하여야 합니다.")
         private Double lng;
+
+        private String addressName;
     }
 
     @Getter
@@ -53,5 +57,8 @@ public class RouteGenerateRequest {
     public static class PreferencesDto {
         private boolean avoidMainRoad;
         private boolean preferPark;
+        private boolean avoidStairs;
+        private boolean preferWaterfront;
+        private String maxSlopeLevel;
     }
 }

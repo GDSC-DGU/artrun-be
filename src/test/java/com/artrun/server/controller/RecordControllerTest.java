@@ -37,7 +37,7 @@ class RecordControllerTest {
     @DisplayName("POST /api/v1/records/save - 저장 성공")
     void saveRecord_success() throws Exception {
         RecordResponse response = RecordResponse.builder()
-                .recordId("record-001").totalDistanceMeters(4850.0)
+                .recordId("record-001").totalDistanceMeters(4850.0).totalDistanceKm(4.85)
                 .totalTimeSeconds(1800).averageSpeed(2.69).build();
         when(recordService.saveRecord(eq("user-1"), any())).thenReturn(response);
 
@@ -55,7 +55,7 @@ class RecordControllerTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.recordId").value("record-001"))
-                .andExpect(jsonPath("$.data.totalDistanceMeters").value(4850.0));
+                .andExpect(jsonPath("$.data.totalDistanceKm").value(4.85));
     }
 
     @Test
@@ -76,15 +76,15 @@ class RecordControllerTest {
     void getRecord_success() throws Exception {
         RecordDetailResponse response = RecordDetailResponse.builder()
                 .recordId("record-001").routeId("route-001")
-                .totalDistanceMeters(4850.0).totalTimeSeconds(1800)
-                .actualPolyline(List.of()).plannedPolyline(List.of())
+                .totalDistanceKm(4.85).totalTimeSeconds(1800)
+                .targetRoutePolyline(List.of()).correctedPolyline(List.of())
                 .createdAt(LocalDateTime.now()).build();
         when(recordService.getRecord("user-1", "record-001")).thenReturn(response);
 
         mockMvc.perform(get("/api/v1/records/record-001"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.recordId").value("record-001"))
-                .andExpect(jsonPath("$.data.totalDistanceMeters").value(4850.0));
+                .andExpect(jsonPath("$.data.totalDistanceKm").value(4.85));
     }
 
     @Test

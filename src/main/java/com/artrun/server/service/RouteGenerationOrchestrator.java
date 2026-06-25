@@ -91,6 +91,7 @@ public class RouteGenerationOrchestrator {
                     CandidateResult c = sorted.get(rank);
                     Route route = Route.builder()
                             .task(task)
+                            .routeName(resolveRouteName(task.getShapeType()))
                             .polyline(c.polyline())
                             .originalShape(c.originalShape())
                             .distanceMeters(c.distanceMeters())
@@ -160,6 +161,15 @@ public class RouteGenerationOrchestrator {
 
         return new CandidateResult(routePolyline, originalShape, distanceMeters,
                 similarity, pedestrianRatio, compositeScore);
+    }
+
+    private String resolveRouteName(String shapeType) {
+        if (shapeType == null) return "러닝 루트";
+        return switch (shapeType.toUpperCase()) {
+            case "STAR" -> "별 러닝 루트";
+            case "HEART" -> "하트 러닝 루트";
+            default -> shapeType + " 러닝 루트";
+        };
     }
 
     private List<AnchorPoint> rotatePoints(List<AnchorPoint> points, double angleDegrees) {

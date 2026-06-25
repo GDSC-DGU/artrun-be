@@ -18,6 +18,7 @@ import org.springframework.test.web.servlet.MockMvc;
 import java.util.List;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
@@ -36,7 +37,7 @@ class RouteControllerTest {
     @DisplayName("POST /api/v1/routes/generate - 202 반환")
     void generateRoute_returns202() throws Exception {
         when(routeService.generateRoute(any())).thenReturn(
-                TaskResponse.builder().taskId("task-1234").message("경로 생성을 시작합니다.").build());
+                TaskResponse.builder().taskId("task-1234").status("PENDING").build());
 
         mockMvc.perform(post("/api/v1/routes/generate").with(csrf())
                         .contentType(MediaType.APPLICATION_JSON)
@@ -73,7 +74,7 @@ class RouteControllerTest {
                         .status("COMPLETED")
                         .candidateRoutes(List.of(
                                 RouteStatusResponse.CandidateRouteDto.builder()
-                                        .routeId("R_001").distance(4850.0)
+                                        .routeId("R_001").distanceKm(4.85)
                                         .similarityScore(92.0).polyline(List.of()).build()))
                         .build());
 
@@ -89,21 +90,21 @@ class RouteControllerTest {
     void getRoute_success() throws Exception {
         when(routeService.getRoute("route-001")).thenReturn(
                 RouteDetailResponse.builder()
-                        .routeId("route-001").distanceMeters(5000.0)
+                        .routeId("route-001").distanceKm(5.0)
                         .polyline(List.of()).checkpoints(List.of()).build());
 
         mockMvc.perform(get("/api/v1/routes/route-001"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.routeId").value("route-001"))
-                .andExpect(jsonPath("$.data.distanceMeters").value(5000.0));
+                .andExpect(jsonPath("$.data.distanceKm").value(5.0));
     }
 
     @Test
     @WithMockCustomUser
     @DisplayName("POST /api/v1/routes/{routeId}/regenerate - 202 반환")
     void regenerateRoute_returns202() throws Exception {
-        when(routeService.regenerateRoute("route-001")).thenReturn(
-                TaskResponse.builder().taskId("task-new").message("새로운 경로 생성을 시작합니다.").build());
+        when(routeService.regenerateRoute(eq("route-001"), any())).thenReturn(
+                TaskResponse.builder().taskId("task-new").status("PENDING").build());
 
         mockMvc.perform(post("/api/v1/routes/route-001/regenerate").with(csrf()))
                 .andExpect(status().isAccepted())

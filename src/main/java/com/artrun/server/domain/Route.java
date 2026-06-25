@@ -30,10 +30,12 @@ public class Route {
     @Column(columnDefinition = "geometry(Geometry, 4326)")
     private Geometry originalShape;
 
+    private String routeName;
     private Double distanceMeters;
     private Double similarityScore;
     private Double pedestrianRoadRatio;
     private Integer ranking;
+    private String previewImageUrl;
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;

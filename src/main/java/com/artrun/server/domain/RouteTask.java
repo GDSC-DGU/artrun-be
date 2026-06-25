@@ -27,12 +27,17 @@ public class RouteTask {
     private String shapeType;
     private String activityType;
     private Double targetDistanceKm;
+    private Integer targetPaceSecPerKm;
+    private String startAddressName;
 
     @Column(columnDefinition = "geometry(Point, 4326)")
     private Point startPoint;
 
     private Boolean avoidMainRoad;
     private Boolean preferPark;
+    private Boolean avoidStairs;
+    private Boolean preferWaterfront;
+    private String maxSlopeLevel;
     @Column(columnDefinition = "TEXT")
     private String errorMessage;
 

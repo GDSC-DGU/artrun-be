@@ -5,6 +5,8 @@ import jakarta.validation.constraints.Size;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
+import java.util.List;
+
 @Getter
 @NoArgsConstructor
 public class RegisterCommunityRouteRequest {
@@ -18,4 +20,8 @@ public class RegisterCommunityRouteRequest {
 
     @Size(max = 500, message = "설명은 500자 이하로 입력해주세요.")
     private String description;
+
+    private List<String> tags;
+
+    private String visibility = "PUBLIC";
 }

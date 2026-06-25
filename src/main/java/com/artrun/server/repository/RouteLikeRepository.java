@@ -11,4 +11,5 @@ public interface RouteLikeRepository extends JpaRepository<RouteLike, String> {
     boolean existsByUser_IdAndCommunityRoute_Id(String userId, String communityRouteId);
     Optional<RouteLike> findByUser_IdAndCommunityRoute_Id(String userId, String communityRouteId);
     Page<RouteLike> findByUser_IdOrderByCreatedAtDesc(String userId, Pageable pageable);
+    long countByUser_Id(String userId);
 }

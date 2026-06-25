@@ -30,6 +30,14 @@ public class ApiResponse<T> {
                 .build();
     }
 
+    public static <T> ApiResponse<T> fail(String message, T data) {
+        return ApiResponse.<T>builder()
+                .success(false)
+                .message(message)
+                .data(data)
+                .build();
+    }
+
     public static ApiResponse<Void> error(String message) {
         return ApiResponse.<Void>builder()
                 .success(false)

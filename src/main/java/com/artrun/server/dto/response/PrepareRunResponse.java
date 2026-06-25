@@ -6,7 +6,9 @@ import lombok.Getter;
 @Getter
 @Builder
 public class PrepareRunResponse {
+    private String communityRouteId;
     private String routeId;
-    private double distanceToStart;
-    private boolean canRun;
+    private boolean runnable;
+    private double startDistanceMeters;
+    private String message;
 }

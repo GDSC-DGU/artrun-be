@@ -36,7 +36,15 @@ public class RunRecord {
     private Double totalDistanceMeters;
     private Integer totalTimeSeconds;
     private Double averageSpeed;
+    private Integer averagePaceSecPerKm;
+    private Integer averageBpm;
+    private Integer calories;
+    private Integer matchRate;
+    private Integer completionRate;
     private String imageUrl;
+
+    @Column(columnDefinition = "text")
+    private String rawGpsJson;
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;

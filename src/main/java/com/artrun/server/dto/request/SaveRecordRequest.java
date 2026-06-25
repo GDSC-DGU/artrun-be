@@ -26,6 +26,10 @@ public class SaveRecordRequest {
     @NotNull(message = "총 운동 시간을 입력해주세요.")
     private Integer totalTimeSeconds;
 
+    private Integer averagePaceSecPerKm;
+    private Integer averageBpm;
+    private Integer calories;
+
     @Getter
     @NoArgsConstructor
     @AllArgsConstructor
@@ -33,5 +37,8 @@ public class SaveRecordRequest {
         private double lat;
         private double lng;
         private long timestamp;
+        private Double accuracyMeters;
+        private Double speed;
+        private Double heading;
     }
 }

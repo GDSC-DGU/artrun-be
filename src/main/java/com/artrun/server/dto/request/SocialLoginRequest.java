@@ -12,5 +12,5 @@ public class SocialLoginRequest {
     private String provider;
 
     @NotBlank(message = "소셜 액세스 토큰을 입력해주세요.")
-    private String token;
+    private String providerAccessToken;
 }

@@ -64,7 +64,7 @@ class AuthServiceTest {
         AuthResponse response = authService.signup(req);
 
         assertThat(response.getAccessToken()).isEqualTo("access");
-        assertThat(response.getUser().getId()).isEqualTo("user-1");
+        assertThat(response.getUser().getUserId()).isEqualTo("user-1");
     }
 
     @Test

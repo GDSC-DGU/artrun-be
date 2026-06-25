@@ -14,6 +14,7 @@ import org.locationtech.jts.geom.*;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.Optional;
 
@@ -28,6 +29,7 @@ class CommunityServiceTest {
     @Mock RouteLikeRepository routeLikeRepository;
     @Mock RunRecordRepository runRecordRepository;
     @Mock UserRepository userRepository;
+    @Mock JdbcTemplate jdbcTemplate;
 
     @InjectMocks CommunityService communityService;
 
@@ -126,12 +128,14 @@ class CommunityServiceTest {
         when(communityRouteRepository.findById("cr-1")).thenReturn(Optional.of(cr));
 
         PrepareRunRequest req = new PrepareRunRequest();
-        setField(req, "lat", 37.5666); // 출발점에서 약 11m
-        setField(req, "lng", 126.9781);
+        PrepareRunRequest.CurrentPointDto cp1 = new PrepareRunRequest.CurrentPointDto();
+        setField(cp1, "lat", 37.5666); // 출발점에서 약 11m
+        setField(cp1, "lng", 126.9781);
+        setField(req, "currentPoint", cp1);
 
         PrepareRunResponse response = communityService.prepareRun("cr-1", req);
 
-        assertThat(response.isCanRun()).isTrue();
+        assertThat(response.isRunnable()).isTrue();
         assertThat(response.getRouteId()).isEqualTo("route-1");
     }
 
@@ -153,12 +157,14 @@ class CommunityServiceTest {
         when(communityRouteRepository.findById("cr-1")).thenReturn(Optional.of(cr));
 
         PrepareRunRequest req = new PrepareRunRequest();
-        setField(req, "lat", 37.600); // 출발점에서 약 4km 이상
-        setField(req, "lng", 127.000);
+        PrepareRunRequest.CurrentPointDto cp2 = new PrepareRunRequest.CurrentPointDto();
+        setField(cp2, "lat", 37.600); // 출발점에서 약 4km 이상
+        setField(cp2, "lng", 127.000);
+        setField(req, "currentPoint", cp2);
 
         PrepareRunResponse response = communityService.prepareRun("cr-1", req);
 
-        assertThat(response.isCanRun()).isFalse();
+        assertThat(response.isRunnable()).isFalse();
     }
 
     private RegisterCommunityRouteRequest makeRegisterReq(String recordId, String title, String desc) {

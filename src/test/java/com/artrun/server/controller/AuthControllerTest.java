@@ -120,7 +120,7 @@ class AuthControllerTest {
                         .content("""
                                 {
                                     "provider": "KAKAO",
-                                    "token": "kakao-access-token"
+                                    "providerAccessToken": "kakao-access-token"
                                 }
                                 """))
                 .andExpect(status().isOk())

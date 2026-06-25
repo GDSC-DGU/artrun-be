@@ -13,6 +13,10 @@ public class SessionDetailResponse {
     private String sessionId;
     private String routeId;
     private String status;
+    private Integer completionRate;
+    private Integer distanceTraveledMeters;
+    private Integer distanceRemainingMeters;
     private LocalDateTime startedAt;
-    private LocalDateTime finishedAt;
+    private LocalDateTime pausedAt;
+    private LocalDateTime lastTrackedAt;
 }

@@ -24,4 +24,7 @@ public class TrackRequest {
 
     private Long timestamp;
     private Double currentSpeed;
+    private Double accuracyMeters;
+    private Double heading;
+    private Double altitude;
 }

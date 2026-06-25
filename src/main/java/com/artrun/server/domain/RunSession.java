@@ -31,7 +31,19 @@ public class RunSession {
     private SessionStatus status;
 
     private LocalDateTime startedAt;
+    private LocalDateTime pausedAt;
+    private LocalDateTime resumedAt;
     private LocalDateTime finishedAt;
+    private LocalDateTime canceledAt;
+    private String cancelReason;
+    private Integer lastCompletionRate;
+    private Integer lastDistanceTraveledMeters;
+    private Integer lastDistanceRemainingMeters;
+    private LocalDateTime lastTrackedAt;
+    private Integer targetPaceSecPerKm;
+    private Boolean voiceGuideEnabled;
+    private Boolean edmControlEnabled;
+    private Integer totalTimeSeconds;
 
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;

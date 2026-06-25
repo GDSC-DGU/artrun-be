@@ -45,7 +45,7 @@ class UserServiceTest {
 
         UserResponse response = userService.getMe("user-1");
 
-        assertThat(response.getId()).isEqualTo("user-1");
+        assertThat(response.getUserId()).isEqualTo("user-1");
         assertThat(response.getNickname()).isEqualTo("테스터");
     }
 
@@ -67,15 +67,15 @@ class UserServiceTest {
         when(userRepository.findById("user-1")).thenReturn(Optional.of(user));
         when(runRecordRepository.countByUser_Id("user-1")).thenReturn(5L);
         when(runRecordRepository.sumDistanceByUserId("user-1")).thenReturn(25000.0); // 25km
-        when(runRecordRepository.sumTimeByUserId("user-1")).thenReturn(7500L); // 7500초
+        when(communityRouteRepository.countByUser_Id("user-1")).thenReturn(2L);
+        when(routeLikeRepository.countByUser_Id("user-1")).thenReturn(7L);
 
         MyPageSummaryResponse summary = userService.getSummary("user-1");
 
-        assertThat(summary.getTotalRuns()).isEqualTo(5);
+        assertThat(summary.getTotalRunCount()).isEqualTo(5);
         assertThat(summary.getTotalDistanceKm()).isEqualTo(25.0);
-        assertThat(summary.getTotalTimeSeconds()).isEqualTo(7500);
-        // avgPace = (7500s / 60) / 25km = 5.0 min/km
-        assertThat(summary.getAveragePaceMinPerKm()).isEqualTo(5.0);
+        assertThat(summary.getSharedRouteCount()).isEqualTo(2);
+        assertThat(summary.getLikedRouteCount()).isEqualTo(7);
     }
 
     @Test

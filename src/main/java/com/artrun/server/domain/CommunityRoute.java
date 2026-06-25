@@ -4,6 +4,8 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "community_routes")
@@ -32,6 +34,18 @@ public class CommunityRoute {
     @Column(columnDefinition = "TEXT")
     private String description;
 
+    private String locationName;
+
+    @Builder.Default
+    @ElementCollection
+    @CollectionTable(name = "community_route_tags", joinColumns = @JoinColumn(name = "community_route_id"))
+    @Column(name = "tag")
+    private List<String> tags = new ArrayList<>();
+
+    @Column(nullable = false)
+    @Builder.Default
+    private String visibility = "PUBLIC";
+
     @Column(nullable = false)
     private int likeCount;
 
@@ -42,5 +56,6 @@ public class CommunityRoute {
     protected void onCreate() {
         createdAt = LocalDateTime.now();
         likeCount = 0;
+        if (visibility == null) visibility = "PUBLIC";
     }
 }
