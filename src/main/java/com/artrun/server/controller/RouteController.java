@@ -36,14 +36,14 @@ public class RouteController {
     @GetMapping("/status/{taskId}")
     public ResponseEntity<ApiResponse<RouteStatusResponse>> getStatus(
             @Parameter(description = "경로 생성 작업 ID") @PathVariable String taskId) {
-        return ResponseEntity.ok(ApiResponse.ok(routeService.getTaskStatus(taskId)));
+        return ResponseEntity.ok(ApiResponse.ok("경로 생성 완료", routeService.getTaskStatus(taskId)));
     }
 
     @Operation(summary = "루트 상세 조회 (체크포인트 포함)")
     @GetMapping("/{routeId}")
     public ResponseEntity<ApiResponse<RouteDetailResponse>> getRoute(
             @Parameter(description = "루트 ID") @PathVariable String routeId) {
-        return ResponseEntity.ok(ApiResponse.ok(routeService.getRoute(routeId)));
+        return ResponseEntity.ok(ApiResponse.ok("러닝 루트 상세 조회 성공", routeService.getRoute(routeId)));
     }
 
     @Operation(summary = "루트 재생성 요청 (기존 조건 기반)")

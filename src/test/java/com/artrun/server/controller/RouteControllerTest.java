@@ -75,7 +75,7 @@ class RouteControllerTest {
                         .candidateRoutes(List.of(
                                 RouteStatusResponse.CandidateRouteDto.builder()
                                         .routeId("R_001").distanceKm(4.85)
-                                        .similarityScore(92.0).polyline(List.of()).build()))
+                                        .similarityScore(92).polyline(List.of()).build()))
                         .build());
 
         mockMvc.perform(get("/api/v1/routes/status/task-1234"))

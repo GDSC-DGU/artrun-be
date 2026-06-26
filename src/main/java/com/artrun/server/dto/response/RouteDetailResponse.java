@@ -1,6 +1,7 @@
 package com.artrun.server.dto.response;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import lombok.Builder;
 import lombok.Getter;
 
@@ -10,6 +11,13 @@ import java.util.List;
 @Getter
 @Builder
 @JsonInclude(JsonInclude.Include.NON_NULL)
+@JsonPropertyOrder({
+        "routeId", "routeName", "shapeType", "activityType",
+        "distanceKm", "estimatedTimeSeconds", "targetPaceSecPerKm",
+        "similarityScore", "pedestrianRoadRatio", "expectedBpm",
+        "startPoint", "endPoint", "bounds", "polyline",
+        "checkpoints", "turnInstructions", "previewImageUrl", "createdAt"
+})
 public class RouteDetailResponse {
     private String routeId;
     private String routeName;
@@ -18,8 +26,8 @@ public class RouteDetailResponse {
     private Double distanceKm;
     private Integer estimatedTimeSeconds;
     private Integer targetPaceSecPerKm;
-    private Double similarityScore;
-    private Double pedestrianRoadRatio;
+    private Integer similarityScore;
+    private Integer pedestrianRoadRatio;
     private Integer expectedBpm;
     private LatLng startPoint;
     private LatLng endPoint;

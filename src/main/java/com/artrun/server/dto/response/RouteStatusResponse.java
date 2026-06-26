@@ -29,8 +29,8 @@ public class RouteStatusResponse {
         private Double distanceKm;
         private Integer estimatedTimeSeconds;
         private Integer targetPaceSecPerKm;
-        private Double similarityScore;
-        private Double pedestrianRoadRatio;
+        private Integer similarityScore;
+        private Integer pedestrianRoadRatio;
         private Integer expectedBpm;
         private RouteDetailResponse.LatLng startPoint;
         private RouteDetailResponse.LatLng endPoint;
