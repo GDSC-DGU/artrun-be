@@ -47,13 +47,14 @@ services:
       S3_BUCKET: ${S3_BUCKET}
       AWS_REGION: ap-northeast-2
       S3_BASE_URL: ${S3_BASE_URL}
+      LOGGING_LEVEL_COM_ARTRUN_SERVER: DEBUG
 
     depends_on:
       db:
         condition: service_healthy
       redis:
         condition: service_started
-
+    
 volumes:
   pgdata:
   redisdata:
